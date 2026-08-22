@@ -142,3 +142,25 @@ in the dashboard afterward.
 | R2 | <10MB avatar | 10GB |
 | Bundle (gzip) | ~26KB worker | 3MB |
 | Access | ≤50 club members | free |
+| Workers Logs | a few events/request | 200K events/day |
+
+## Observability
+
+Workers Logs is enabled (free tier: 200K log events/day, 3-day retention).
+Wrangler config:
+
+```jsonc
+"observability": { "enabled": true, "head_sampling_rate": 1 }
+```
+
+The Worker emits **structured JSON logs** (auto-indexed by Workers Logs) for:
+
+- `request` — method, path, status, duration_ms (every request)
+- `link_click` — link_id, label (when someone clicks a link)
+- `admin_request` — email, method, path (every admin API call)
+- `profile_updated` / `avatar_uploaded` / `link_created` / `link_updated` / `link_deleted` — admin audit trail
+- `unhandled_error` — path, message, name (via Hono's `onError`)
+
+View them: dashboard → **Workers & Pages → `link` → Observability**. Filter by
+`message`, `link_id`, `email`, or `status`. For streaming live logs in a
+terminal: `npx wrangler tail link`.

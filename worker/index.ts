@@ -18,6 +18,7 @@ import {
 } from "./db";
 import { injectMeta } from "./meta";
 import { ensureSchema } from "./schema";
+import { logger } from "./log";
 
 type Bindings = Env;
 
@@ -30,8 +31,27 @@ const app = new Hono<AppEnv>();
 
 // Self-heal on an empty (auto-provisioned) D1 before any DB-backed route runs.
 app.use("*", async (c, next) => {
+  const start = Date.now();
   await ensureSchema(c.env.DB);
   await next();
+  const ms = Date.now() - start;
+  const url = new URL(c.req.url);
+  logger.info("request", {
+    method: c.req.method,
+    path: url.pathname,
+    status: c.res.status,
+    duration_ms: ms,
+  });
+});
+
+app.onError((err, c) => {
+  const url = new URL(c.req.url);
+  logger.error("unhandled_error", {
+    path: url.pathname,
+    message: err.message,
+    name: err.name,
+  });
+  return c.json({ error: "Internal Server Error" }, 500);
 });
 
 // SPA shell with live OG meta injected. Served before static assets on "/".
@@ -71,7 +91,12 @@ app.get("/api/click/:id", async (c) => {
   if (!Number.isInteger(id)) return c.notFound();
   const link = await getLink(c.env.DB, id);
   if (!link) return c.notFound();
-  c.executionCtx.waitUntil(recordClick(c.env.DB, id, c.req.header("Referer") ?? null));
+  c.executionCtx.waitUntil(
+    (async () => {
+      await recordClick(c.env.DB, id, c.req.header("Referer") ?? null);
+      logger.info("link_click", { link_id: id, label: link.label });
+    })(),
+  );
   return c.redirect(link.url, 302);
 });
 
@@ -83,7 +108,9 @@ app.get("/api/click/:id", async (c) => {
 app.use("/api/admin/*", async (c, next) => {
   const payload = await verifyAccess(c.env, c.req.raw);
   if (!payload) return c.json({ error: "Unauthorized" }, 403);
-  c.set("email", payload.email ?? "unknown");
+  const email = payload.email ?? "unknown";
+  c.set("email", email);
+  logger.info("admin_request", { email, method: c.req.method, path: new URL(c.req.url).pathname });
   await next();
 });
 
@@ -105,6 +132,7 @@ app.put("/api/admin/profile", async (c) => {
     accentColor: body.accentColor,
     socials: body.socials,
   });
+  logger.info("profile_updated", { email: c.get("email"), fields: Object.keys(body) });
   return c.json({ profile });
 });
 
@@ -122,6 +150,7 @@ app.post("/api/admin/avatar", async (c) => {
     await c.env.UPLOADS.delete(profile.avatarKey).catch(() => {});
   }
   await setAvatarKey(c.env.DB, key);
+  logger.info("avatar_uploaded", { email: c.get("email"), key });
   return c.json({ key });
 });
 
@@ -134,6 +163,7 @@ app.post("/api/admin/links", async (c) => {
     icon: body.icon,
     highlight: body.highlight,
   });
+  logger.info("link_created", { email: c.get("email"), link_id: link.id, label: link.label });
   return c.json({ link });
 });
 
@@ -147,12 +177,14 @@ app.put("/api/admin/links/:id", async (c) => {
     highlight: body.highlight,
   });
   if (!link) return c.notFound();
+  logger.info("link_updated", { email: c.get("email"), link_id: id });
   return c.json({ link });
 });
 
 app.delete("/api/admin/links/:id", async (c) => {
   const id = Number(c.req.param("id"));
   await deleteLink(c.env.DB, id);
+  logger.info("link_deleted", { email: c.get("email"), link_id: id });
   return c.body(null, 204);
 });
 
