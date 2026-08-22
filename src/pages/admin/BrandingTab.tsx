@@ -267,13 +267,13 @@ export default function BrandingTab() {
       </section>
 
       {/* Save */}
-      <section className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
+      <div className="flex items-center justify-end gap-3">
         <SavedBadge />
         <Button onClick={saveAll} disabled={saveMutation.isPending}>
           {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
           Save profile
         </Button>
-      </section>
+      </div>
     </div>
   );
 }
