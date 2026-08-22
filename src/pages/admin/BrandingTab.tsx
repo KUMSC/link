@@ -37,7 +37,7 @@ export default function BrandingTab() {
   const [newUrl, setNewUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -45,8 +45,10 @@ export default function BrandingTab() {
     mode: "onChange",
   });
 
+  const hydrated = useRef(false);
   useEffect(() => {
-    if (data) {
+    if (data && !hydrated.current) {
+      hydrated.current = true;
       form.reset({
         orgName: data.profile.orgName,
         tagline: data.profile.tagline,
@@ -62,64 +64,25 @@ export default function BrandingTab() {
       updateProfile({ ...values, socials: values.socials.filter((s) => s.url.trim()) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
-      setSaveState("saved");
+      setSavedAt(Date.now());
+      toast.success("Saved");
     },
-    onError: (e) => {
-      setSaveState("idle");
-      toast.error(e instanceof Error ? e.message : "Save failed");
-    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Save failed"),
   });
 
-  // Debounced auto-save: watches form values + socials, saves ~800ms after the last change.
-  const socialsRef = useRef(socials);
-  socialsRef.current = socials;
-  const saveStateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const sub = form.watch(() => {
-      if (saveStateTimer.current) clearTimeout(saveStateTimer.current);
-      setSaveState("saving");
-      saveStateTimer.current = setTimeout(() => {
-        const current = form.getValues();
-        if (!form.formState.isValid) {
-          setSaveState("idle");
-          return;
-        }
-        saveMutation.mutate({
-          orgName: current.orgName,
-          tagline: current.tagline,
-          accentColor: current.accentColor,
-          socials: socialsRef.current,
-        });
-      }, 800);
-    });
-    return () => sub.unsubscribe();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Socials edits bypass the form, so trigger the same debounced save on change.
-  const socialsInitial = useRef(socials);
-  useEffect(() => {
-    if (socialsInitial.current === socials) {
-      socialsInitial.current = socials;
+  const saveAll = () => {
+    const current = form.getValues();
+    if (!current.orgName.trim()) {
+      toast.error("Organization name is required");
       return;
     }
-    socialsInitial.current = socials;
-    if (saveStateTimer.current) clearTimeout(saveStateTimer.current);
-    setSaveState("saving");
-    saveStateTimer.current = setTimeout(() => {
-      const current = form.getValues();
-      if (!form.formState.isValid) {
-        setSaveState("idle");
-        return;
-      }
-      saveMutation.mutate({
-        orgName: current.orgName,
-        tagline: current.tagline,
-        accentColor: current.accentColor,
-        socials: socialsRef.current,
-      });
-    }, 800);
-  }, [socials]); // eslint-disable-line react-hooks/exhaustive-deps
+    saveMutation.mutate({
+      orgName: current.orgName,
+      tagline: current.tagline,
+      accentColor: current.accentColor,
+      socials,
+    });
+  };
 
   const avatarMutation = useMutation({
     mutationFn: uploadAvatar,
@@ -132,8 +95,6 @@ export default function BrandingTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Upload failed"),
   });
 
-  const accent = form.watch("accentColor");
-
   const addSocial = () => {
     const url = newUrl.trim();
     if (!validateUrl(url)) {
@@ -144,20 +105,16 @@ export default function BrandingTab() {
     setNewUrl("");
   };
 
-  const SaveIndicator = () => (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      {saveState === "saving" && (
-        <>
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
-        </>
-      )}
-      {saveState === "saved" && (
-        <>
-          <Check className="h-3.5 w-3.5 text-emerald-600" /> Saved
-        </>
-      )}
-    </span>
-  );
+  const accent = form.watch("accentColor");
+
+  const SavedBadge = () => {
+    if (!savedAt) return null;
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-emerald-600">
+        <Check className="h-3.5 w-3.5" /> Saved
+      </span>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -165,7 +122,7 @@ export default function BrandingTab() {
       <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Profile</h2>
-          <SaveIndicator />
+          <SavedBadge />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="orgName">Organization name</Label>
@@ -181,18 +138,19 @@ export default function BrandingTab() {
         <div className="grid gap-2">
           <Label htmlFor="accent">Accent color</Label>
           <div className="flex items-center gap-3">
-            <Input
-              id="accent"
-              type="color"
-              className="h-10 w-16 cursor-pointer p-1"
-              {...form.register("accentColor")}
-            />
+            <Input id="accent" type="color" className="h-10 w-16 cursor-pointer p-1" {...form.register("accentColor")} />
             <Input
               className="w-32 font-mono text-sm"
-              value={form.watch("accentColor")}
-              onChange={(e) => form.setValue("accentColor", e.target.value)}
+              value={accent}
+              onChange={(e) => form.setValue("accentColor", e.target.value, { shouldValidate: true })}
             />
           </div>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={saveAll} disabled={saveMutation.isPending}>
+            {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Save profile
+          </Button>
         </div>
       </section>
 
@@ -226,10 +184,7 @@ export default function BrandingTab() {
               }}
             />
           </label>
-          <Button
-            onClick={() => avatarFile && avatarMutation.mutate(avatarFile)}
-            disabled={!avatarFile || avatarMutation.isPending}
-          >
+          <Button onClick={() => avatarFile && avatarMutation.mutate(avatarFile)} disabled={!avatarFile || avatarMutation.isPending}>
             {avatarMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Upload
           </Button>
@@ -240,7 +195,7 @@ export default function BrandingTab() {
       <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Social links</h2>
-          <SaveIndicator />
+          <SavedBadge />
         </div>
         {socials.length === 0 && <p className="text-sm text-muted-foreground">No social links yet.</p>}
         <div className="flex flex-col gap-2">
@@ -250,9 +205,7 @@ export default function BrandingTab() {
               <Input
                 className="flex-1 font-mono text-xs"
                 value={s.url}
-                onChange={(e) =>
-                  setSocials((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))
-                }
+                onChange={(e) => setSocials((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
               />
               <Button
                 variant="ghost"
