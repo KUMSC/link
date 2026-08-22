@@ -45,16 +45,19 @@ Cloudflare can **auto-provision** the D1 database and R2 bucket for you. In
 creates the resources automatically and injects the real id on deploy.
 
 1. Push this repo to GitHub (done).
-2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import repository**
+2. **Enable R2 (one-time):** Cloudflare dashboard → **R2** → **Activate R2**. R2 has a
+   free tier but must be opted into before any bucket can be created. Without this,
+   the deploy fails with `code: 10042 (Please enable R2)`.
+3. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import repository**
    (or use the *Deploy to Cloudflare* button if the repo is public).
-3. Cloudflare clones the repo, **auto-creates `club-link-db` + `club-link-uploads`**,
+4. Cloudflare clones the repo, **auto-creates `club-link-db` + `club-link-uploads`**,
    and deploys. Subsequent pushes to the connected branch redeploy automatically.
-4. Apply the schema to the remote database:
+5. Apply the schema to the remote database:
    ```bash
    npm run db:migrate:remote   # auto-resolves the provisioned D1 id
    npm run db:seed:remote
    ```
-5. Set the two secrets (never auto-created):
+6. Set the two secrets (never auto-created):
    ```bash
    npx wrangler secret put ACCESS_TEAM_DOMAIN   # e.g. https://yourteam.cloudflareaccess.com
    npx wrangler secret put ACCESS_AUD           # your Access application AUD tag
