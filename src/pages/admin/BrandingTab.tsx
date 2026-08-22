@@ -128,9 +128,14 @@ export default function BrandingTab() {
     setNewUrl("");
   };
 
-  const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
+    const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
+
+  // Tracks manual palette edits: mode switching keeps custom colors instead of
+  // resetting to the preset's palette for the new mode.
+  const paletteDirty = useRef(false);
 
   const updatePalette = (key: keyof Theme["palette"], value: string) => {
+    paletteDirty.current = true;
     setDraftTheme((t) => ({ ...t, palette: { ...t.palette, [key]: value } }));
   };
 
@@ -158,8 +163,8 @@ export default function BrandingTab() {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-      <div className="flex flex-col gap-8">
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+      <div className="flex min-w-0 flex-col gap-6">
         {/* Profile */}
         <Card>
           <CardHeader>
@@ -199,9 +204,10 @@ export default function BrandingTab() {
                   <button
                     key={preset.id}
                     type="button"
-                    onClick={() =>
-                      setDraftTheme((t) => ({ ...themeFromPreset(preset.id, t.mode, t), preset: preset.id }))
-                    }
+                    onClick={() => {
+                      paletteDirty.current = false;
+                      setDraftTheme((t) => ({ ...themeFromPreset(preset.id, t.mode), fontFamily: t.fontFamily }));
+                    }}
                     className={cn(
                       "flex flex-col gap-2 rounded-xl border p-3 text-left transition-colors hover:border-ring",
                       draftTheme.preset === preset.id ? "border-ring ring-1 ring-ring" : "",
@@ -234,9 +240,20 @@ export default function BrandingTab() {
               </Select>
             </div>
 
-            <div className="grid gap-3">
+                        <div className="grid gap-3">
               <Label>Mode</Label>
-              <Tabs value={draftTheme.mode} onValueChange={(v) => setDraftTheme((t) => ({ ...t, mode: v as ThemeMode }))}>
+              <Tabs
+                value={draftTheme.mode}
+                onValueChange={(v) =>
+                  setDraftTheme((t) => {
+                    const mode = v as ThemeMode;
+                    // Switching mode adopts the preset's palette for that mode,
+                    // unless the user has customized colors (tracked separately).
+                    if (paletteDirty.current) return { ...t, mode };
+                    return { ...themeFromPreset(t.preset, mode), fontFamily: t.fontFamily };
+                  })
+                }
+              >
                 <TabsList>
                   {(Object.keys(MODE_LABELS) as ThemeMode[]).map((mode) => (
                     <TabsTrigger key={mode} value={mode}>
@@ -395,12 +412,12 @@ export default function BrandingTab() {
       </div>
 
       {/* Live preview */}
-      <div className="lg:sticky lg:top-6">
-        <div className="overflow-hidden rounded-2xl border shadow-xl">
-          <div className="border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">Live preview</div>
-          <div className="max-h-[70vh] overflow-y-auto bg-white">
+      <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
+        <div className="flex h-full flex-col overflow-hidden rounded-2xl border shadow-xl">
+          <div className="border-b bg-muted/50 px-4 py-2.5 text-xs font-medium text-muted-foreground">Live preview</div>
+          <div className="min-h-[420px] flex-1 lg:overflow-y-auto">
             <ThemeProvider theme={draftTheme}>
-              <PageShell data={previewData} interactive={false} />
+              <PageShell data={previewData} interactive={false} embedded />
             </ThemeProvider>
           </div>
         </div>

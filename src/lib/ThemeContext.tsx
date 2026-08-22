@@ -20,11 +20,9 @@ export function useTheme() {
 
 /** Resolves a Theme into CSS variables applied to the nearest container. */
 export function resolveThemeVars(theme: Theme): CSSProperties {
-  const family = fontCssVar(theme);
   const effectiveMode = theme.mode === "system" ? "light" : theme.mode;
   return {
-    "--font-family": family,
-    "--font-sans": family,
+    fontFamily: fontCssVar(theme),
     "--accent": theme.palette.accent,
     "--surface": theme.palette.surface,
     "--text": theme.palette.text,

@@ -152,8 +152,10 @@ function EmptyState({ accent }: { accent: string }) {
   );
 }
 
-/** Renders the public page from a given data payload. Reused by the admin live preview. */
-export function PageShell({ data, interactive = true }: { data: PageData; interactive?: boolean }) {
+/** Renders the public page from a given data payload. Reused by the admin live preview.
+ *  `embedded` renders inside a container (no min-height, no own scroll) so it can
+ *  sit in the admin's preview pane without fighting its layout. */
+export function PageShell({ data, interactive = true, embedded = false }: { data: PageData; interactive?: boolean; embedded?: boolean }) {
   const { theme, cssVars } = useTheme();
   const { profile, links } = data;
   const featured = links.filter((l) => l.highlight === 1);
@@ -168,7 +170,12 @@ export function PageShell({ data, interactive = true }: { data: PageData; intera
   } as CSSProperties;
 
   return (
-    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center px-6 py-16" style={bg}>
+    <main
+      className={`relative mx-auto flex w-full max-w-md flex-col items-center px-6 ${
+        embedded ? "min-h-full py-10" : "min-h-screen py-16"
+      }`}
+      style={bg}
+    >
       <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} />
 
       {profile.orgName && (

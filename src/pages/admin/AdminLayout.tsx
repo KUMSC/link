@@ -45,7 +45,7 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-6 py-10">
+    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-8 sm:px-6 sm:py-10">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight">{data.profile.orgName}</h1>
@@ -56,7 +56,7 @@ export default function AdminLayout() {
         </a>
       </header>
 
-      <nav className="mt-6 flex gap-1 rounded-xl border bg-card p-1">
+            <nav className="mt-5 flex gap-1 rounded-xl border bg-card p-1">
         {tabs.map((tab) => (
           <NavLink
             key={tab.to}
@@ -74,7 +74,7 @@ export default function AdminLayout() {
         ))}
       </nav>
 
-      <main className="mt-8 flex-1">
+      <main className="mt-6 flex-1">
         <Outlet />
       </main>
     </div>
