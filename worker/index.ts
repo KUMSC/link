@@ -16,7 +16,7 @@ import {
   updateLink,
   updateProfile,
 } from "./db";
-import { injectMeta } from "./meta";
+import { injectBootstrap, injectMeta } from "./meta";
 import { ensureSchema } from "./schema";
 import { logger } from "./log";
 
@@ -56,10 +56,12 @@ app.onError((err, c) => {
 
 // SPA shell with live OG meta injected. Served before static assets on "/".
 app.get("/", async (c) => {
-  const profile = await getProfile(c.env.DB);
+  const [profile, links] = await Promise.all([getProfile(c.env.DB), getLinks(c.env.DB)]);
   const origin = new URL(c.req.url).origin;
   const assetRes = await c.env.ASSETS.fetch(c.req.raw);
-  const html = injectMeta(await assetRes.text(), profile, origin);
+  let html = await assetRes.text();
+  html = injectMeta(html, profile, origin);
+  html = injectBootstrap(html, profile, links);
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

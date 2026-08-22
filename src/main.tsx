@@ -6,10 +6,26 @@ import { Toaster } from "sonner";
 import "./styles.css";
 import PublicPage from "./pages/PublicPage";
 
-const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
-const LinksTab = lazy(() => import("./pages/admin/LinksTab"));
-const BrandingTab = lazy(() => import("./pages/admin/BrandingTab"));
-const AnalyticsTab = lazy(() => import("./pages/admin/AnalyticsTab"));
+/**
+ * Loads a lazy chunk, retrying once with a cache-busting query param if the
+ * initial load hits a stale-hash 404 / MIME mismatch (common across Worker
+ * redeploys before the browser's cached HTML has expired).
+ */
+function resilientLazy<T extends React.ComponentType<object>>(loader: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    loader().catch((err) => {
+      if (sessionStorage.getItem("cf-stale-reload")) throw err;
+      sessionStorage.setItem("cf-stale-reload", "1");
+      window.location.reload();
+      return new Promise<never>(() => {});
+    }),
+  );
+}
+
+const AdminLayout = resilientLazy(() => import("./pages/admin/AdminLayout"));
+const LinksTab = resilientLazy(() => import("./pages/admin/LinksTab"));
+const BrandingTab = resilientLazy(() => import("./pages/admin/BrandingTab"));
+const AnalyticsTab = resilientLazy(() => import("./pages/admin/AnalyticsTab"));
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -124,8 +124,14 @@ export default function PublicPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["public"],
     queryFn: getPublic,
-    staleTime: 5_000,
+    // Auto-refresh: keep the page live without manual reloads.
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+    staleTime: 5_000,
+    // Hydrate instantly from the payload the Worker embeds in the HTML shell,
+    // so the first paint needs zero network round-trips.
+    initialData: (window as Window & { __PUBLIC_DATA__?: PublicData }).__PUBLIC_DATA__,
   });
 
   if (isLoading) {
