@@ -100,7 +100,7 @@ export interface LinkStats {
 }
 
 export interface DailyPoint {
-  date: string;
+  day: string;
   clicks: number;
   views: number;
   uniques: number;

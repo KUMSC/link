@@ -17,7 +17,15 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { Separator } from "../../components/ui/separator";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { cn } from "../../lib/utils";
 
 const profileSchema = z.object({
@@ -64,12 +72,7 @@ export default function BrandingTab() {
   }, [data, form]);
 
   const saveMutation = useMutation({
-    mutationFn: (values: {
-      orgName: string;
-      tagline: string;
-      socials: SocialRow[];
-      theme: Theme;
-    }) =>
+    mutationFn: (values: { orgName: string; tagline: string; socials: SocialRow[]; theme: Theme }) =>
       updateProfile({
         orgName: values.orgName,
         tagline: values.tagline,
@@ -158,229 +161,228 @@ export default function BrandingTab() {
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
       <div className="flex flex-col gap-8">
         {/* Profile */}
-        <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Profile</h2>
-            <SavedBadge />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="orgName">Organization name</Label>
-            <Input id="orgName" placeholder="Your organization" {...form.register("orgName")} />
-            {form.formState.errors.orgName && (
-              <p className="text-xs text-destructive">{form.formState.errors.orgName.message}</p>
-            )}
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="tagline">Tagline / bio</Label>
-            <Textarea id="tagline" placeholder="Latest events, forms & socials" {...form.register("tagline")} />
-          </div>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile</CardTitle>
+            <CardAction>
+              <SavedBadge />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="orgName">Organization name</Label>
+              <Input id="orgName" placeholder="Your organization" {...form.register("orgName")} />
+              {form.formState.errors.orgName && (
+                <p className="text-xs text-destructive">{form.formState.errors.orgName.message}</p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="tagline">Tagline / bio</Label>
+              <Textarea id="tagline" placeholder="Latest events, forms & socials" {...form.register("tagline")} />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Theme */}
-        <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Theme</h2>
-            <SavedBadge />
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Preset</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {THEME_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() =>
-                    setDraftTheme((t) => ({ ...themeFromPreset(preset.id, t.mode, t), preset: preset.id }))
-                  }
-                  className={cn(
-                    "flex flex-col gap-2 rounded-xl border p-3 text-left transition-colors hover:border-ring",
-                    draftTheme.preset === preset.id ? "border-ring ring-1 ring-ring" : "",
-                  )}
-                >
-                  <span className="flex gap-1">
-                    {preset.swatches.map((c) => (
-                      <span key={c} className="h-4 w-4 rounded-full" style={{ background: c }} />
-                    ))}
-                  </span>
-                  <span className="text-xs font-medium">{preset.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="font">Font</Label>
-            <Select
-              value={draftTheme.fontFamily}
-              onValueChange={(v) => setDraftTheme((t) => ({ ...t, fontFamily: v }))}
-            >
-              <SelectTrigger id="font">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_CHOICES.map((f) => (
-                  <SelectItem key={f.name} value={f.name}>
-                    {f.name}
-                  </SelectItem>
+        <Card>
+          <CardHeader>
+            <CardTitle>Theme</CardTitle>
+            <CardAction>
+              <SavedBadge />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6">
+            <div className="grid gap-3">
+              <Label>Preset</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {THEME_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() =>
+                      setDraftTheme((t) => ({ ...themeFromPreset(preset.id, t.mode, t), preset: preset.id }))
+                    }
+                    className={cn(
+                      "flex flex-col gap-2 rounded-xl border p-3 text-left transition-colors hover:border-ring",
+                      draftTheme.preset === preset.id ? "border-ring ring-1 ring-ring" : "",
+                    )}
+                  >
+                    <span className="flex gap-1">
+                      {preset.swatches.map((c) => (
+                        <span key={c} className="h-4 w-4 rounded-full" style={{ background: c }} />
+                      ))}
+                    </span>
+                    <span className="text-xs font-medium">{preset.name}</span>
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Mode</Label>
-            <div className="flex gap-2">
-              {(Object.keys(MODE_LABELS) as ThemeMode[]).map((mode) => (
-                <Button
-                  key={mode}
-                  type="button"
-                  variant={draftTheme.mode === mode ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDraftTheme((t) => ({ ...t, mode }))}
-                >
-                  {MODE_LABELS[mode]}
-                </Button>
-              ))}
+              </div>
             </div>
-          </div>
 
-          <div className="grid gap-2">
-            <Label>Colors</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {(
-                [
-                  ["accent", "Accent"],
-                  ["surface", "Background"],
-                  ["text", "Text"],
-                  ["muted", "Muted"],
-                ] as const
-              ).map(([key, label]) => (
-                <div key={key} className="flex items-center gap-2">
+            <div className="grid gap-3">
+              <Label htmlFor="font">Font</Label>
+              <Select value={draftTheme.fontFamily} onValueChange={(v) => setDraftTheme((t) => ({ ...t, fontFamily: v }))}>
+                <SelectTrigger id="font">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FONT_CHOICES.map((f) => (
+                    <SelectItem key={f.name} value={f.name}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-3">
+              <Label>Mode</Label>
+              <Tabs value={draftTheme.mode} onValueChange={(v) => setDraftTheme((t) => ({ ...t, mode: v as ThemeMode }))}>
+                <TabsList>
+                  {(Object.keys(MODE_LABELS) as ThemeMode[]).map((mode) => (
+                    <TabsTrigger key={mode} value={mode}>
+                      {MODE_LABELS[mode]}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="grid gap-3">
+              <Label>Colors</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ["accent", "Accent"],
+                    ["surface", "Background"],
+                    ["text", "Text"],
+                    ["muted", "Muted"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <Input
+                      type="color"
+                      className="h-9 w-10 cursor-pointer p-0.5"
+                      value={draftTheme.palette[key]}
+                      onChange={(e) => updatePalette(key, e.target.value)}
+                      aria-label={label}
+                    />
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Avatar */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Avatar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div
+                className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white"
+                style={{ background: draftTheme.palette.accent }}
+              >
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Avatar preview" className="h-full w-full object-cover" />
+                ) : (
+                  (form.watch("orgName") || "?").slice(0, 2).toUpperCase()
+                )}
+              </div>
+              <label className="flex-1">
+                <Input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error("Image must be under 5MB");
+                      return;
+                    }
+                    setAvatarFile(file);
+                    setAvatarPreview(URL.createObjectURL(file));
+                  }}
+                />
+              </label>
+              <Button onClick={() => avatarFile && avatarMutation.mutate(avatarFile)} disabled={!avatarFile || avatarMutation.isPending}>
+                {avatarMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Upload
+              </Button>
+              {hasAvatar && (
+                <Button
+                  variant="outline"
+                  onClick={() => avatarRemoveMutation.mutate()}
+                  disabled={avatarRemoveMutation.isPending}
+                  aria-label="Remove avatar"
+                >
+                  {avatarRemoveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+                  Remove
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Socials */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Social links</CardTitle>
+            <CardAction>
+              <SavedBadge />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {socials.length === 0 && <p className="text-sm text-muted-foreground">No social links yet.</p>}
+            <div className="flex flex-col gap-2">
+              {socials.map((s, i) => (
+                <div key={`${s.platform}-${i}`} className="flex items-center gap-2">
+                  <span className="w-28 text-sm font-medium">{PLATFORM_LABELS[s.platform]}</span>
                   <Input
-                    type="color"
-                    className="h-9 w-10 cursor-pointer p-0.5"
-                    value={draftTheme.palette[key]}
-                    onChange={(e) => updatePalette(key, e.target.value)}
-                    aria-label={label}
+                    className="flex-1 font-mono text-xs"
+                    value={s.url}
+                    onChange={(e) => setSocials((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
                   />
-                  <span className="text-xs text-muted-foreground">{label}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSocials((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label={`Remove ${PLATFORM_LABELS[s.platform]}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* Avatar */}
-        <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-          <h2 className="text-base font-semibold">Avatar</h2>
-          <div className="flex items-center gap-4">
-            <div
-              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white"
-              style={{ background: draftTheme.palette.accent }}
-            >
-              {avatarPreview ? (
-                <img src={avatarPreview} alt="Avatar preview" className="h-full w-full object-cover" />
-              ) : (
-                (form.watch("orgName") || "?").slice(0, 2).toUpperCase()
-              )}
-            </div>
-            <label className="flex-1">
+            <Separator />
+            <div className="flex items-center gap-2">
+              <Select value={newPlatform} onValueChange={(v) => setNewPlatform(v as PlatformId)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SOCIAL_PLATFORMS.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {PLATFORM_LABELS[p]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/avif"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 5 * 1024 * 1024) {
-                    toast.error("Image must be under 5MB");
-                    return;
-                  }
-                  setAvatarFile(file);
-                  setAvatarPreview(URL.createObjectURL(file));
-                }}
+                className="flex-1 font-mono text-xs"
+                placeholder="https://instagram.com/yourhandle"
+                value={newUrl}
+                onChange={(e) => setNewUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addSocial()}
               />
-            </label>
-            <Button
-              onClick={() => avatarFile && avatarMutation.mutate(avatarFile)}
-              disabled={!avatarFile || avatarMutation.isPending}
-            >
-              {avatarMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Upload
-            </Button>
-            {hasAvatar && (
-              <Button
-                variant="outline"
-                onClick={() => avatarRemoveMutation.mutate()}
-                disabled={avatarRemoveMutation.isPending}
-                aria-label="Remove avatar"
-              >
-                {avatarRemoveMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ImageOff className="h-4 w-4" />
-                )}
-                Remove
+              <Button variant="outline" size="icon" onClick={addSocial} aria-label="Add social link">
+                <Plus className="h-4 w-4" />
               </Button>
-            )}
-          </div>
-        </section>
-
-        {/* Socials */}
-        <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Social links</h2>
-            <SavedBadge />
-          </div>
-          {socials.length === 0 && <p className="text-sm text-muted-foreground">No social links yet.</p>}
-          <div className="flex flex-col gap-2">
-            {socials.map((s, i) => (
-              <div key={`${s.platform}-${i}`} className="flex items-center gap-2">
-                <span className="w-28 text-sm font-medium">{PLATFORM_LABELS[s.platform]}</span>
-                <Input
-                  className="flex-1 font-mono text-xs"
-                  value={s.url}
-                  onChange={(e) =>
-                    setSocials((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))
-                  }
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSocials((prev) => prev.filter((_, j) => j !== i))}
-                  aria-label={`Remove ${PLATFORM_LABELS[s.platform]}`}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
-          </div>
-          <Separator />
-          <div className="flex items-center gap-2">
-            <Select value={newPlatform} onValueChange={(v) => setNewPlatform(v as PlatformId)}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SOCIAL_PLATFORMS.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {PLATFORM_LABELS[p]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              className="flex-1 font-mono text-xs"
-              placeholder="https://instagram.com/yourhandle"
-              value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addSocial()}
-            />
-            <Button variant="outline" size="icon" onClick={addSocial} aria-label="Add social link">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </section>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Save */}
         <div className="flex items-center justify-end gap-3">
@@ -395,9 +397,7 @@ export default function BrandingTab() {
       {/* Live preview */}
       <div className="lg:sticky lg:top-6">
         <div className="overflow-hidden rounded-2xl border shadow-xl">
-          <div className="border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
-            Live preview
-          </div>
+          <div className="border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">Live preview</div>
           <div className="max-h-[70vh] overflow-y-auto bg-white">
             <ThemeProvider theme={draftTheme}>
               <PageShell data={previewData} interactive={false} />

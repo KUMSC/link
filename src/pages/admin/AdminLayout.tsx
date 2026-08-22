@@ -3,6 +3,7 @@ import { NavLink, Outlet } from "react-router";
 import { Link2, Palette, BarChart3 } from "lucide-react";
 import { getAdminData } from "../../lib/api";
 import { cn } from "../../lib/utils";
+import { Card, CardContent } from "../../components/ui/card";
 
 const tabs = [
   { to: "/admin/links", label: "Links", icon: Link2 },
@@ -30,13 +31,15 @@ export default function AdminLayout() {
   if (isError || !data) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="max-w-sm rounded-2xl border bg-card p-8 text-center">
-          <h1 className="text-lg font-semibold">Access required</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Your Cloudflare Access session is missing or expired. Please sign in through the
-            Access login page and try again.
-          </p>
-        </div>
+        <Card>
+          <CardContent className="max-w-sm p-8 text-center">
+            <h1 className="text-lg font-semibold">Access required</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your Cloudflare Access session is missing or expired. Please sign in through the
+              Access login page and try again.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

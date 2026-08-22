@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table";
+import { Card, CardContent } from "../../components/ui/card";
 
 const linkSchema = z
   .object({
@@ -256,8 +257,9 @@ export default function LinksTab() {
         </Button>
       </div>
 
-      <div className="rounded-xl border bg-card">
-        <Table>
+      <Card>
+        <CardContent className="p-0">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-10" />
@@ -340,7 +342,8 @@ export default function LinksTab() {
             ))}
           </TableBody>
         </Table>
-      </div>
+        </CardContent>
+      </Card>
 
       <LinkEditor open={editorOpen} onOpenChange={setEditorOpen} editing={editing} accent={accent} />
     </div>
