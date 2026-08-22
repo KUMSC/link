@@ -59,6 +59,10 @@ export async function setAvatarKey(db: D1Database, key: string): Promise<void> {
   await db.prepare("UPDATE profile SET avatar_key = ?, updated_at = unixepoch() WHERE id = 1").bind(key).run();
 }
 
+export async function clearAvatarKey(db: D1Database): Promise<void> {
+  await db.prepare("UPDATE profile SET avatar_key = NULL, updated_at = unixepoch() WHERE id = 1").run();
+}
+
 export async function getLinks(db: D1Database): Promise<LinkItem[]> {
   const res = await db
     .prepare("SELECT id, label, url, icon, highlight, sort_order, created_at FROM links ORDER BY sort_order ASC, id ASC")

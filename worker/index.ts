@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "./env";
 import { verifyAccess } from "./access";
 import {
+  clearAvatarKey,
   createLink,
   deleteLink,
   getClickTotals,
@@ -156,6 +157,16 @@ app.post("/api/admin/avatar", async (c) => {
   await setAvatarKey(c.env.DB, key);
   logger.info("avatar_uploaded", { email: c.get("email"), key });
   return c.json({ key });
+});
+
+app.delete("/api/admin/avatar", async (c) => {
+  const profile = await getProfile(c.env.DB);
+  if (profile.avatarKey) {
+    await c.env.UPLOADS.delete(profile.avatarKey).catch(() => {});
+  }
+  await clearAvatarKey(c.env.DB);
+  logger.info("avatar_removed", { email: c.get("email") });
+  return c.json({ ok: true });
 });
 
 app.post("/api/admin/links", async (c) => {

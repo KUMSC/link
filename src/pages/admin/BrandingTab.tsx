@@ -4,8 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Check, Loader2, Plus, Trash2 } from "lucide-react";
-import { getAdminData, updateProfile, uploadAvatar } from "../../lib/api";
+import { Check, ImageOff, Loader2, Plus, Trash2 } from "lucide-react";
+import { getAdminData, removeAvatar, updateProfile, uploadAvatar } from "../../lib/api";
 import { PLATFORM_LABELS, SOCIAL_PLATFORMS, validateUrl } from "../../lib/platforms";
 import type { PlatformId } from "../../lib/types";
 import { Button } from "../../components/ui/button";
@@ -95,6 +95,17 @@ export default function BrandingTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Upload failed"),
   });
 
+  const avatarRemoveMutation = useMutation({
+    mutationFn: removeAvatar,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      toast.success("Avatar removed");
+      setAvatarFile(null);
+      setAvatarPreview(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Remove failed"),
+  });
+
   const addSocial = () => {
     const url = newUrl.trim();
     if (!validateUrl(url)) {
@@ -106,6 +117,7 @@ export default function BrandingTab() {
   };
 
   const accent = form.watch("accentColor");
+  const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
 
   const SavedBadge = () => {
     if (!savedAt) return null;
@@ -146,12 +158,6 @@ export default function BrandingTab() {
             />
           </div>
         </div>
-        <div className="flex justify-end">
-          <Button onClick={saveAll} disabled={saveMutation.isPending}>
-            {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Save profile
-          </Button>
-        </div>
       </section>
 
       {/* Avatar */}
@@ -188,6 +194,21 @@ export default function BrandingTab() {
             {avatarMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Upload
           </Button>
+          {hasAvatar && (
+            <Button
+              variant="outline"
+              onClick={() => avatarRemoveMutation.mutate()}
+              disabled={avatarRemoveMutation.isPending}
+              aria-label="Remove avatar"
+            >
+              {avatarRemoveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ImageOff className="h-4 w-4" />
+              )}
+              Remove
+            </Button>
+          )}
         </div>
       </section>
 
@@ -243,6 +264,15 @@ export default function BrandingTab() {
             <Plus className="h-4 w-4" />
           </Button>
         </div>
+      </section>
+
+      {/* Save */}
+      <section className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
+        <SavedBadge />
+        <Button onClick={saveAll} disabled={saveMutation.isPending}>
+          {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          Save profile
+        </Button>
       </section>
     </div>
   );

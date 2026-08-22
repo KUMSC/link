@@ -57,6 +57,11 @@ export async function uploadAvatar(file: File): Promise<{ key: string }> {
   );
 }
 
+export async function removeAvatar(): Promise<void> {
+  const res = await fetch(`${BASE}/admin/avatar`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to remove avatar");
+}
+
 export async function createLink(fields: {
   label: string;
   url: string;
