@@ -1,11 +1,37 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { ArrowUpRight, CalendarClock, Clock, MapPin, Sparkles } from "lucide-react";
 import { getPublic } from "../lib/api";
-import type { PublicData } from "../lib/types";
+import type { LinkItem, Profile } from "../lib/types";
 import { PlatformIcon } from "../lib/icons";
+import { ThemeProvider, useTheme } from "../lib/ThemeContext";
 
-const ACCENT_DEFAULT = "#6366f1";
+export interface PageData {
+  profile: Profile;
+  links: LinkItem[];
+}
+
+function formatTime(ts: number): string {
+  const d = new Date(ts * 1000);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const sameDay = d.toDateString() === today.toDateString();
+  const nextDay = d.toDateString() === tomorrow.toDateString();
+  const day = sameDay ? "Today" : nextDay ? "Tomorrow" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${day}, ${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+}
+
+function useCountdown(endTs: number | null): string | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!endTs || endTs * 1000 <= now) return;
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, [endTs, now]);
+  return endTs && endTs * 1000 > now ? formatTime(endTs) : null;
+}
 
 function Avatar({ name, accent, hasAvatar }: { name: string; accent: string; hasAvatar: boolean }) {
   return (
@@ -19,12 +45,13 @@ function Avatar({ name, accent, hasAvatar }: { name: string; accent: string; has
         <img
           src="/api/avatar"
           alt={name}
-          className="relative h-28 w-28 rounded-full border-4 border-white object-cover shadow-xl"
+          className="relative h-28 w-28 rounded-full border-4 object-cover shadow-xl"
+          style={{ borderColor: "var(--surface)" }}
         />
       ) : (
         <div
-          className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-white text-4xl font-extrabold tracking-tight text-white shadow-xl"
-          style={{ background: `linear-gradient(135deg, ${accent}, ${accent}bb)` }}
+          className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 text-4xl font-extrabold tracking-tight text-white shadow-xl"
+          style={{ background: `linear-gradient(135deg, ${accent}, ${accent}bb)`, borderColor: "var(--surface)" }}
           aria-hidden
         >
           {(name || "?").slice(0, 2).toUpperCase()}
@@ -34,10 +61,10 @@ function Avatar({ name, accent, hasAvatar }: { name: string; accent: string; has
   );
 }
 
-function SocialRow({ socials, accent }: { socials: PublicData["profile"]["socials"]; accent: string }) {
+function SocialRow({ socials, accent }: { socials: Profile["socials"]; accent: string }) {
   if (socials.length === 0) return null;
   return (
-    <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5" style={{ "--hover-accent": accent } as CSSProperties}>
+    <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5">
       {socials.map((s) => (
         <a
           key={s.platform}
@@ -46,15 +73,10 @@ function SocialRow({ socials, accent }: { socials: PublicData["profile"]["social
           rel="noopener noreferrer"
           aria-label={s.platform}
           title={s.platform}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-card/80 text-muted-foreground shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:border-transparent hover:text-white hover:shadow-lg"
-          style={{ ["--hover-accent" as string]: undefined }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget as HTMLElement;
-            el.style.background = `linear-gradient(135deg, ${accent}, ${accent}cc)`;
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "";
-          }}
+          className="flex h-11 w-11 items-center justify-center rounded-full border shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:text-white hover:shadow-lg"
+          style={{ borderColor: "color-mix(in srgb, var(--text) 18%, transparent)", color: "var(--muted)" }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = `linear-gradient(135deg, ${accent}, ${accent}cc)`)}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
         >
           <PlatformIcon platform={s.platform} size={19} />
         </a>
@@ -63,15 +85,35 @@ function SocialRow({ socials, accent }: { socials: PublicData["profile"]["social
   );
 }
 
-function LinkCard({
-  link,
-  accent,
-  featured,
-}: {
-  link: PublicData["links"][number];
-  accent: string;
-  featured: boolean;
-}) {
+function EventCard({ link, accent }: { link: LinkItem; accent: string }) {
+  const timeLabel = useCountdown(link.endsAt ?? null);
+  return (
+    <a
+      href={`/api/click/${link.id}`}
+      className="group relative flex items-center gap-3 overflow-hidden rounded-2xl px-5 py-4 text-left text-white shadow-lg transition-all hover:-translate-y-1 hover:shadow-2xl"
+      style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)` }}
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20">
+        <CalendarClock className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-semibold">{link.label}</p>
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-white/85">
+          <Clock className="h-3 w-3" />
+          {timeLabel ?? "See details"}
+          {link.location && (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" /> {link.location}
+            </span>
+          )}
+        </p>
+      </div>
+      <ArrowUpRight className="h-4 w-4 opacity-70 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+    </a>
+  );
+}
+
+function LinkCard({ link, accent, featured }: { link: LinkItem; accent: string; featured: boolean }) {
   if (featured) {
     return (
       <a
@@ -82,40 +124,124 @@ function LinkCard({
         <Sparkles className="h-4 w-4" />
         <span className="relative">{link.label}</span>
         <ArrowUpRight className="absolute right-5 h-4.5 w-4.5 opacity-70 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
-        <div
-          className="absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
-          style={{ background: "radial-gradient(400px 120px at 50% 0%, rgba(255,255,255,0.22), transparent)" }}
-          aria-hidden
-        />
       </a>
     );
   }
   return (
     <a
       href={`/api/click/${link.id}`}
-      className="group relative flex items-center justify-center gap-2.5 rounded-2xl border border-border/70 bg-card px-6 py-4 text-[15px] font-medium text-card-foreground shadow-sm backdrop-blur transition-all hover:-translate-y-1 hover:border-transparent hover:shadow-xl"
-      style={{ ["--hover-accent" as string]: accent }}
-      onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.boxShadow = `0 20px 45px -12px ${accent}55`;
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "";
-      }}
+      className="group relative flex items-center justify-center gap-2.5 rounded-2xl border px-6 py-4 text-[15px] font-medium shadow-sm backdrop-blur transition-all hover:-translate-y-1 hover:shadow-xl"
+      style={{ borderColor: "color-mix(in srgb, var(--text) 15%, transparent)", color: "var(--text)", background: "var(--surface)" }}
+      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.boxShadow = `0 20px 45px -12px ${accent}55`)}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.boxShadow = "")}
     >
       <span>{link.label}</span>
-      <ArrowUpRight className="absolute right-5 h-4.5 w-4.5 text-muted-foreground opacity-30 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100" />
+      <ArrowUpRight className="absolute right-5 h-4.5 w-4.5 opacity-30 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100" />
     </a>
   );
 }
 
 function EmptyState({ accent }: { accent: string }) {
   return (
-    <div className="mt-10 flex w-full flex-col items-center gap-3 rounded-2xl border border-dashed border-border/80 bg-card/50 px-6 py-10 text-center">
-      <p className="text-sm font-medium text-muted-foreground">This page isn't set up yet.</p>
-      <p className="text-xs text-muted-foreground/70">
+    <div className="mt-10 flex w-full flex-col items-center gap-3 rounded-2xl border border-dashed px-6 py-10 text-center" style={{ borderColor: "color-mix(in srgb, var(--text) 20%, transparent)" }}>
+      <p className="text-sm font-medium" style={{ color: "var(--muted)" }}>This page isn't set up yet.</p>
+      <p className="text-xs" style={{ color: "var(--muted)" }}>
         Visit <span className="font-mono" style={{ color: accent }}>/admin</span> to add your name, links and socials.
       </p>
+    </div>
+  );
+}
+
+/** Renders the public page from a given data payload. Reused by the admin live preview. */
+export function PageShell({ data, interactive = true }: { data: PageData; interactive?: boolean }) {
+  const { theme, cssVars } = useTheme();
+  const { profile, links } = data;
+  const featured = links.filter((l) => l.highlight === 1);
+  const events = links.filter((l) => l.kind === "event");
+  const regular = links.filter((l) => l.kind !== "event" && l.highlight === 0);
+  const accent = theme.palette.accent;
+  const configured = !!(profile.orgName || links.length > 0 || profile.socials.length > 0);
+
+  const bg = {
+    ...cssVars,
+    background: `radial-gradient(1100px 480px at 50% -10%, ${accent}22, transparent 62%), radial-gradient(700px 300px at 85% 108%, ${accent}0f, transparent 60%), var(--page-bg)`,
+  } as CSSProperties;
+
+  return (
+    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center px-6 py-16" style={bg}>
+      <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} />
+
+      {profile.orgName && (
+        <h1 className="mt-6 text-center text-3xl font-bold tracking-tight" style={{ color: "var(--text)" }}>
+          {profile.orgName}
+        </h1>
+      )}
+      {profile.tagline && (
+        <p className="mt-2.5 max-w-xs text-center text-[15px] leading-relaxed" style={{ color: "var(--muted)" }}>
+          {profile.tagline}
+        </p>
+      )}
+
+      <SocialRow socials={profile.socials} accent={accent} />
+
+      <div className="mt-10 flex w-full flex-col gap-3">
+        {featured.map((link) => (
+          <LinkCard key={link.id} link={link} accent={accent} featured />
+        ))}
+        {events.map((link) => (
+          <EventCard key={link.id} link={link} accent={accent} />
+        ))}
+        {regular.map((link) => (
+          <LinkCard key={link.id} link={link} accent={accent} featured={false} />
+        ))}
+        {!configured && <EmptyState accent={accent} />}
+      </div>
+
+      {interactive && <ShareRow />}
+    </main>
+  );
+}
+
+function ShareRow() {
+  const [copied, setCopied] = useState(false);
+  const url = typeof window !== "undefined" ? window.location.origin : "";
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  };
+  const shareUrl = encodeURIComponent(url);
+  return (
+    <div className="mt-14 flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
+      <button
+        onClick={copy}
+        className="rounded-full border px-3 py-1.5 transition-colors hover:opacity-80"
+        style={{ borderColor: "color-mix(in srgb, var(--text) 18%, transparent)" }}
+      >
+        {copied ? "Copied!" : "Copy link"}
+      </button>
+      <a
+        href={`https://x.com/intent/post?url=${shareUrl}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-full border px-3 py-1.5 transition-colors hover:opacity-80"
+        style={{ borderColor: "color-mix(in srgb, var(--text) 18%, transparent)" }}
+      >
+        Post on X
+      </a>
+      <a
+        href={`https://wa.me/?text=${shareUrl}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-full border px-3 py-1.5 transition-colors hover:opacity-80"
+        style={{ borderColor: "color-mix(in srgb, var(--text) 18%, transparent)" }}
+      >
+        WhatsApp
+      </a>
     </div>
   );
 }
@@ -124,14 +250,11 @@ export default function PublicPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["public"],
     queryFn: getPublic,
-    // Auto-refresh: keep the page live without manual reloads.
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     staleTime: 5_000,
-    // Hydrate instantly from the payload the Worker embeds in the HTML shell,
-    // so the first paint needs zero network round-trips.
-    initialData: (window as Window & { __PUBLIC_DATA__?: PublicData }).__PUBLIC_DATA__,
+    initialData: (window as Window & { __PUBLIC_DATA__?: PageData }).__PUBLIC_DATA__,
   });
 
   if (isLoading) {
@@ -153,38 +276,9 @@ export default function PublicPage() {
     );
   }
 
-  const { profile, links } = data;
-  const featured = links.filter((l) => l.highlight === 1);
-  const regular = links.filter((l) => l.highlight === 0);
-  const accent = profile.accentColor || ACCENT_DEFAULT;
-  const configured = !!(profile.orgName || links.length > 0 || profile.socials.length > 0);
-
-  const bg = {
-    background: `radial-gradient(1100px 480px at 50% -10%, ${accent}1f, transparent 62%), radial-gradient(700px 300px at 85% 108%, ${accent}0f, transparent 60%), var(--background)`,
-  } as CSSProperties;
-
   return (
-    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center px-6 py-16" style={bg}>
-      <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} />
-
-      {profile.orgName && (
-        <h1 className="mt-6 text-center text-3xl font-bold tracking-tight">{profile.orgName}</h1>
-      )}
-      {profile.tagline && (
-        <p className="mt-2.5 max-w-xs text-center text-[15px] leading-relaxed text-muted-foreground">{profile.tagline}</p>
-      )}
-
-      <SocialRow socials={profile.socials} accent={accent} />
-
-      <div className="mt-10 flex w-full flex-col gap-3">
-        {featured.map((link) => (
-          <LinkCard key={link.id} link={link} accent={accent} featured />
-        ))}
-        {regular.map((link) => (
-          <LinkCard key={link.id} link={link} accent={accent} featured={false} />
-        ))}
-        {!configured && <EmptyState accent={accent} />}
-      </div>
-    </main>
+    <ThemeProvider theme={data.profile.theme}>
+      <PageShell data={data} />
+    </ThemeProvider>
   );
 }

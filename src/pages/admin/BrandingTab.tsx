@@ -7,18 +7,22 @@ import { toast } from "sonner";
 import { Check, ImageOff, Loader2, Plus, Trash2 } from "lucide-react";
 import { getAdminData, removeAvatar, updateProfile, uploadAvatar } from "../../lib/api";
 import { PLATFORM_LABELS, SOCIAL_PLATFORMS, validateUrl } from "../../lib/platforms";
-import type { PlatformId } from "../../lib/types";
+import { FONT_CHOICES, THEME_PRESETS, themeFromPreset } from "../../lib/themes";
+import { ThemeProvider } from "../../lib/ThemeContext";
+import { PageShell } from "../PublicPage";
+import type { PlatformId, Theme, ThemeMode } from "../../lib/types";
+import { DEFAULT_THEME } from "../../lib/types";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { Separator } from "../../components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { cn } from "../../lib/utils";
 
 const profileSchema = z.object({
   orgName: z.string().min(1, "Organization name is required"),
   tagline: z.string().max(120, "Keep it under 120 characters"),
-  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Enter a hex color like #6366f1"),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -27,6 +31,8 @@ interface SocialRow {
   platform: PlatformId;
   url: string;
 }
+
+const MODE_LABELS: Record<ThemeMode, string> = { light: "Light", dark: "Dark", system: "System" };
 
 export default function BrandingTab() {
   const { data } = useQuery({ queryKey: ["admin-data"], queryFn: getAdminData });
@@ -38,10 +44,11 @@ export default function BrandingTab() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [draftTheme, setDraftTheme] = useState<Theme>(DEFAULT_THEME);
 
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { orgName: "", tagline: "", accentColor: "#6366f1" },
+    defaultValues: { orgName: "", tagline: "" },
     mode: "onChange",
   });
 
@@ -49,19 +56,26 @@ export default function BrandingTab() {
   useEffect(() => {
     if (data && !hydrated.current) {
       hydrated.current = true;
-      form.reset({
-        orgName: data.profile.orgName,
-        tagline: data.profile.tagline,
-        accentColor: data.profile.accentColor,
-      });
+      form.reset({ orgName: data.profile.orgName, tagline: data.profile.tagline });
       setSocials(data.profile.socials);
+      setDraftTheme(data.profile.theme ?? DEFAULT_THEME);
       setAvatarPreview(data.profile.avatarKey ? `/api/avatar?v=${data.profile.updatedAt}` : null);
     }
   }, [data, form]);
 
   const saveMutation = useMutation({
-    mutationFn: (values: { orgName: string; tagline: string; accentColor: string; socials: SocialRow[] }) =>
-      updateProfile({ ...values, socials: values.socials.filter((s) => s.url.trim()) }),
+    mutationFn: (values: {
+      orgName: string;
+      tagline: string;
+      socials: SocialRow[];
+      theme: Theme;
+    }) =>
+      updateProfile({
+        orgName: values.orgName,
+        tagline: values.tagline,
+        socials: values.socials.filter((s) => s.url.trim()),
+        theme: values.theme,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
       setSavedAt(Date.now());
@@ -76,12 +90,7 @@ export default function BrandingTab() {
       toast.error("Organization name is required");
       return;
     }
-    saveMutation.mutate({
-      orgName: current.orgName,
-      tagline: current.tagline,
-      accentColor: current.accentColor,
-      socials,
-    });
+    saveMutation.mutate({ orgName: current.orgName, tagline: current.tagline, socials, theme: draftTheme });
   };
 
   const avatarMutation = useMutation({
@@ -116,8 +125,11 @@ export default function BrandingTab() {
     setNewUrl("");
   };
 
-  const accent = form.watch("accentColor");
   const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
+
+  const updatePalette = (key: keyof Theme["palette"], value: string) => {
+    setDraftTheme((t) => ({ ...t, palette: { ...t.palette, [key]: value } }));
+  };
 
   const SavedBadge = () => {
     if (!savedAt) return null;
@@ -128,151 +140,270 @@ export default function BrandingTab() {
     );
   };
 
-  return (
-    <div className="flex flex-col gap-8">
-      {/* Profile */}
-      <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Profile</h2>
-          <SavedBadge />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="orgName">Organization name</Label>
-          <Input id="orgName" placeholder="Your organization" {...form.register("orgName")} />
-          {form.formState.errors.orgName && (
-            <p className="text-xs text-destructive">{form.formState.errors.orgName.message}</p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="tagline">Tagline / bio</Label>
-          <Textarea id="tagline" placeholder="Latest events, forms & socials" {...form.register("tagline")} />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="accent">Accent color</Label>
-          <div className="flex items-center gap-3">
-            <Input id="accent" type="color" className="h-10 w-16 cursor-pointer p-1" {...form.register("accentColor")} />
-            <Input
-              className="w-32 font-mono text-sm"
-              value={accent}
-              onChange={(e) => form.setValue("accentColor", e.target.value, { shouldValidate: true })}
-            />
-          </div>
-        </div>
-      </section>
+  const previewData = {
+    profile: {
+      id: 1,
+      orgName: form.watch("orgName") || "Your organization",
+      tagline: form.watch("tagline") || "Tagline goes here",
+      avatarKey: data?.profile.avatarKey ?? null,
+      accentColor: draftTheme.palette.accent,
+      socials,
+      theme: draftTheme,
+      updatedAt: Date.now(),
+    },
+    links: data?.links ?? [],
+  };
 
-      {/* Avatar */}
-      <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-        <h2 className="text-base font-semibold">Avatar</h2>
-        <div className="flex items-center gap-4">
-          <div
-            className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white"
-            style={{ background: accent }}
-          >
-            {avatarPreview ? (
-              <img src={avatarPreview} alt="Avatar preview" className="h-full w-full object-cover" />
-            ) : (
-              (form.watch("orgName") || "?").slice(0, 2).toUpperCase()
+  return (
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+      <div className="flex flex-col gap-8">
+        {/* Profile */}
+        <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Profile</h2>
+            <SavedBadge />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="orgName">Organization name</Label>
+            <Input id="orgName" placeholder="Your organization" {...form.register("orgName")} />
+            {form.formState.errors.orgName && (
+              <p className="text-xs text-destructive">{form.formState.errors.orgName.message}</p>
             )}
           </div>
-          <label className="flex-1">
-            <Input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/avif"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                if (file.size > 5 * 1024 * 1024) {
-                  toast.error("Image must be under 5MB");
-                  return;
-                }
-                setAvatarFile(file);
-                setAvatarPreview(URL.createObjectURL(file));
-              }}
-            />
-          </label>
-          <Button onClick={() => avatarFile && avatarMutation.mutate(avatarFile)} disabled={!avatarFile || avatarMutation.isPending}>
-            {avatarMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Upload
-          </Button>
-          {hasAvatar && (
-            <Button
-              variant="outline"
-              onClick={() => avatarRemoveMutation.mutate()}
-              disabled={avatarRemoveMutation.isPending}
-              aria-label="Remove avatar"
-            >
-              {avatarRemoveMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ImageOff className="h-4 w-4" />
-              )}
-              Remove
-            </Button>
-          )}
-        </div>
-      </section>
+          <div className="grid gap-2">
+            <Label htmlFor="tagline">Tagline / bio</Label>
+            <Textarea id="tagline" placeholder="Latest events, forms & socials" {...form.register("tagline")} />
+          </div>
+        </section>
 
-      {/* Socials */}
-      <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Social links</h2>
-          <SavedBadge />
-        </div>
-        {socials.length === 0 && <p className="text-sm text-muted-foreground">No social links yet.</p>}
-        <div className="flex flex-col gap-2">
-          {socials.map((s, i) => (
-            <div key={`${s.platform}-${i}`} className="flex items-center gap-2">
-              <span className="w-28 text-sm font-medium">{PLATFORM_LABELS[s.platform]}</span>
-              <Input
-                className="flex-1 font-mono text-xs"
-                value={s.url}
-                onChange={(e) => setSocials((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSocials((prev) => prev.filter((_, j) => j !== i))}
-                aria-label={`Remove ${PLATFORM_LABELS[s.platform]}`}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-          ))}
-        </div>
-        <Separator />
-        <div className="flex items-center gap-2">
-          <Select value={newPlatform} onValueChange={(v) => setNewPlatform(v as PlatformId)}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SOCIAL_PLATFORMS.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {PLATFORM_LABELS[p]}
-                </SelectItem>
+        {/* Theme */}
+        <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Theme</h2>
+            <SavedBadge />
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Preset</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {THEME_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() =>
+                    setDraftTheme((t) => ({ ...themeFromPreset(preset.id, t.mode, t), preset: preset.id }))
+                  }
+                  className={cn(
+                    "flex flex-col gap-2 rounded-xl border p-3 text-left transition-colors hover:border-ring",
+                    draftTheme.preset === preset.id ? "border-ring ring-1 ring-ring" : "",
+                  )}
+                >
+                  <span className="flex gap-1">
+                    {preset.swatches.map((c) => (
+                      <span key={c} className="h-4 w-4 rounded-full" style={{ background: c }} />
+                    ))}
+                  </span>
+                  <span className="text-xs font-medium">{preset.name}</span>
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-          <Input
-            className="flex-1 font-mono text-xs"
-            placeholder="https://instagram.com/yourhandle"
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addSocial()}
-          />
-          <Button variant="outline" size="icon" onClick={addSocial} aria-label="Add social link">
-            <Plus className="h-4 w-4" />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="font">Font</Label>
+            <Select
+              value={draftTheme.fontFamily}
+              onValueChange={(v) => setDraftTheme((t) => ({ ...t, fontFamily: v }))}
+            >
+              <SelectTrigger id="font">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_CHOICES.map((f) => (
+                  <SelectItem key={f.name} value={f.name}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Mode</Label>
+            <div className="flex gap-2">
+              {(Object.keys(MODE_LABELS) as ThemeMode[]).map((mode) => (
+                <Button
+                  key={mode}
+                  type="button"
+                  variant={draftTheme.mode === mode ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setDraftTheme((t) => ({ ...t, mode }))}
+                >
+                  {MODE_LABELS[mode]}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Colors</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  ["accent", "Accent"],
+                  ["surface", "Background"],
+                  ["text", "Text"],
+                  ["muted", "Muted"],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key} className="flex items-center gap-2">
+                  <Input
+                    type="color"
+                    className="h-9 w-10 cursor-pointer p-0.5"
+                    value={draftTheme.palette[key]}
+                    onChange={(e) => updatePalette(key, e.target.value)}
+                    aria-label={label}
+                  />
+                  <span className="text-xs text-muted-foreground">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Avatar */}
+        <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
+          <h2 className="text-base font-semibold">Avatar</h2>
+          <div className="flex items-center gap-4">
+            <div
+              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white"
+              style={{ background: draftTheme.palette.accent }}
+            >
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="Avatar preview" className="h-full w-full object-cover" />
+              ) : (
+                (form.watch("orgName") || "?").slice(0, 2).toUpperCase()
+              )}
+            </div>
+            <label className="flex-1">
+              <Input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/avif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 5 * 1024 * 1024) {
+                    toast.error("Image must be under 5MB");
+                    return;
+                  }
+                  setAvatarFile(file);
+                  setAvatarPreview(URL.createObjectURL(file));
+                }}
+              />
+            </label>
+            <Button
+              onClick={() => avatarFile && avatarMutation.mutate(avatarFile)}
+              disabled={!avatarFile || avatarMutation.isPending}
+            >
+              {avatarMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Upload
+            </Button>
+            {hasAvatar && (
+              <Button
+                variant="outline"
+                onClick={() => avatarRemoveMutation.mutate()}
+                disabled={avatarRemoveMutation.isPending}
+                aria-label="Remove avatar"
+              >
+                {avatarRemoveMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImageOff className="h-4 w-4" />
+                )}
+                Remove
+              </Button>
+            )}
+          </div>
+        </section>
+
+        {/* Socials */}
+        <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Social links</h2>
+            <SavedBadge />
+          </div>
+          {socials.length === 0 && <p className="text-sm text-muted-foreground">No social links yet.</p>}
+          <div className="flex flex-col gap-2">
+            {socials.map((s, i) => (
+              <div key={`${s.platform}-${i}`} className="flex items-center gap-2">
+                <span className="w-28 text-sm font-medium">{PLATFORM_LABELS[s.platform]}</span>
+                <Input
+                  className="flex-1 font-mono text-xs"
+                  value={s.url}
+                  onChange={(e) =>
+                    setSocials((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))
+                  }
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSocials((prev) => prev.filter((_, j) => j !== i))}
+                  aria-label={`Remove ${PLATFORM_LABELS[s.platform]}`}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Separator />
+          <div className="flex items-center gap-2">
+            <Select value={newPlatform} onValueChange={(v) => setNewPlatform(v as PlatformId)}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SOCIAL_PLATFORMS.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {PLATFORM_LABELS[p]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              className="flex-1 font-mono text-xs"
+              placeholder="https://instagram.com/yourhandle"
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addSocial()}
+            />
+            <Button variant="outline" size="icon" onClick={addSocial} aria-label="Add social link">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </section>
+
+        {/* Save */}
+        <div className="flex items-center justify-end gap-3">
+          <SavedBadge />
+          <Button onClick={saveAll} disabled={saveMutation.isPending}>
+            {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Save profile
           </Button>
         </div>
-      </section>
+      </div>
 
-      {/* Save */}
-      <div className="flex items-center justify-end gap-3">
-        <SavedBadge />
-        <Button onClick={saveAll} disabled={saveMutation.isPending}>
-          {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          Save profile
-        </Button>
+      {/* Live preview */}
+      <div className="lg:sticky lg:top-6">
+        <div className="overflow-hidden rounded-2xl border shadow-xl">
+          <div className="border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+            Live preview
+          </div>
+          <div className="max-h-[70vh] overflow-y-auto bg-white">
+            <ThemeProvider theme={draftTheme}>
+              <PageShell data={previewData} interactive={false} />
+            </ThemeProvider>
+          </div>
+        </div>
       </div>
     </div>
   );

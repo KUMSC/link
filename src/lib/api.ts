@@ -27,8 +27,12 @@ export async function getAdminData(): Promise<{
   return parse(fetch(`${BASE}/admin/data`));
 }
 
-export async function getStats(): Promise<import("./types").StatsData> {
-  return parse(fetch(`${BASE}/admin/stats`));
+export async function getStats(rangeDays: number | "all" = 30): Promise<import("./types").StatsData> {
+  return parse(fetch(`${BASE}/admin/stats?days=${rangeDays}`));
+}
+
+export function statsExportUrl(rangeDays: number | "all" = 30): string {
+  return `${BASE}/admin/stats/export?days=${rangeDays}`;
 }
 
 export async function updateProfile(fields: {
@@ -36,6 +40,7 @@ export async function updateProfile(fields: {
   tagline?: string;
   accentColor?: string;
   socials?: import("./types").Social[];
+  theme?: import("./types").Theme;
 }): Promise<{ profile: import("./types").Profile }> {
   return parse(
     fetch(`${BASE}/admin/profile`, {
@@ -67,6 +72,10 @@ export async function createLink(fields: {
   url: string;
   icon?: string | null;
   highlight?: boolean;
+  kind?: import("./types").LinkKind;
+  startsAt?: number | null;
+  endsAt?: number | null;
+  location?: string | null;
 }): Promise<{ link: import("./types").LinkItem }> {
   return parse(
     fetch(`${BASE}/admin/links`, {
@@ -79,7 +88,16 @@ export async function createLink(fields: {
 
 export async function updateLink(
   id: number,
-  fields: { label?: string; url?: string; icon?: string | null; highlight?: boolean },
+  fields: {
+    label?: string;
+    url?: string;
+    icon?: string | null;
+    highlight?: boolean;
+    kind?: import("./types").LinkKind;
+    startsAt?: number | null;
+    endsAt?: number | null;
+    location?: string | null;
+  },
 ): Promise<{ link: import("./types").LinkItem }> {
   return parse(
     fetch(`${BASE}/admin/links/${id}`, {

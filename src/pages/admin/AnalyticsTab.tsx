@@ -33,7 +33,10 @@ function DailyChart({ data, accent }: { data: { date: string; clicks: number }[]
 }
 
 export default function AnalyticsTab() {
-  const { data, isLoading, isError } = useQuery({ queryKey: ["stats"], queryFn: getStats });
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["stats", 30],
+    queryFn: () => getStats(30),
+  });
   const accent = "#6366f1";
 
   if (isLoading) {
