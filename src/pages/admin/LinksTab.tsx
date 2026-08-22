@@ -4,20 +4,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Pencil, Plus, Star, Trash2 } from "lucide-react";
-import {
-  createLink,
-  deleteLink,
-  getAdminData,
-  reorderLinks,
-  updateLink,
-} from "../../lib/api";
+import { ArrowDown, ArrowUp, CalendarClock, Link as LinkIcon, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { createLink, deleteLink, getAdminData, reorderLinks, updateLink } from "../../lib/api";
 import { validateUrl } from "../../lib/platforms";
-import type { LinkItem } from "../../lib/types";
+import type { LinkItem, LinkKind } from "../../lib/types";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
+import { Badge } from "../../components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +22,13 @@ import {
   DialogTitle,
 } from "../../components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -35,13 +37,36 @@ import {
   TableRow,
 } from "../../components/ui/table";
 
-const linkSchema = z.object({
-  label: z.string().min(1, "Label is required"),
-  url: z.string().min(1, "URL is required").refine(validateUrl, "Enter a valid http(s) URL"),
-  highlight: z.boolean(),
-});
+const linkSchema = z
+  .object({
+    label: z.string().min(1, "Label is required"),
+    url: z.string().min(1, "URL is required").refine(validateUrl, "Enter a valid http(s) URL"),
+    highlight: z.boolean(),
+    kind: z.enum(["link", "event"]),
+    startsAt: z.string().optional(),
+    endsAt: z.string().optional(),
+    location: z.string().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.kind === "event" && !v.startsAt && !v.endsAt) {
+      ctx.addIssue({ code: "custom", path: ["startsAt"], message: "Add a start or end time for the event" });
+    }
+  });
 
 type LinkForm = z.infer<typeof linkSchema>;
+
+function toUnix(datetimeLocal: string | undefined): number | null {
+  if (!datetimeLocal) return null;
+  const d = new Date(datetimeLocal);
+  return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000);
+}
+
+function toLocal(value: number | null | undefined): string {
+  if (!value) return "";
+  const d = new Date(value * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 function LinkEditor({
   open,
@@ -55,9 +80,10 @@ function LinkEditor({
   accent: string;
 }) {
   const queryClient = useQueryClient();
+  const kind = editing?.kind ?? "link";
   const form = useForm<LinkForm>({
     resolver: zodResolver(linkSchema),
-    defaultValues: { label: "", url: "", highlight: false },
+    defaultValues: { label: "", url: "", highlight: false, kind: "link" },
   });
 
   useEffect(() => {
@@ -66,14 +92,29 @@ function LinkEditor({
         label: editing?.label ?? "",
         url: editing?.url ?? "",
         highlight: editing?.highlight === 1,
+        kind: editing?.kind ?? "link",
+        startsAt: toLocal(editing?.startsAt),
+        endsAt: toLocal(editing?.endsAt),
+        location: editing?.location ?? "",
       });
     }
   }, [open, editing, form]);
 
+  const watchedKind = form.watch("kind");
+
   const mutation = useMutation({
     mutationFn: async (values: LinkForm) => {
-      if (editing) return updateLink(editing.id, values);
-      return createLink(values);
+      const payload = {
+        label: values.label,
+        url: values.url,
+        highlight: values.highlight,
+        kind: values.kind,
+        startsAt: toUnix(values.startsAt),
+        endsAt: toUnix(values.endsAt),
+        location: values.location?.trim() || null,
+      };
+      if (editing) return updateLink(editing.id, payload);
+      return createLink(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
@@ -88,12 +129,25 @@ function LinkEditor({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? "Edit link" : "Add link"}</DialogTitle>
-          <DialogDescription>External links like Google Forms, websites, or social pages.</DialogDescription>
+          <DialogDescription>Links open externally; events also show a date, time and place.</DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="flex flex-col gap-4">
           <div className="grid gap-2">
+            <Label htmlFor="kind">Type</Label>
+            <Select value={watchedKind} onValueChange={(v) => form.setValue("kind", v as LinkKind, { shouldValidate: true })}>
+              <SelectTrigger id="kind">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="link">Link</SelectItem>
+                <SelectItem value="event">Event</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
             <Label htmlFor="label">Label</Label>
-            <Input id="label" placeholder="Event Registration Form" {...form.register("label")} />
+            <Input id="label" placeholder={watchedKind === "event" ? "Tech Talk — April 10" : "Event Registration Form"} {...form.register("label")} />
             {form.formState.errors.label && (
               <p className="text-xs text-destructive">{form.formState.errors.label.message}</p>
             )}
@@ -105,9 +159,30 @@ function LinkEditor({
               <p className="text-xs text-destructive">{form.formState.errors.url.message}</p>
             )}
           </div>
+
+          {watchedKind === "event" && (
+            <div className="grid gap-3 rounded-lg border p-3">
+              <div className="grid gap-2">
+                <Label htmlFor="startsAt">Starts at</Label>
+                <Input id="startsAt" type="datetime-local" {...form.register("startsAt")} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="endsAt">Ends at</Label>
+                <Input id="endsAt" type="datetime-local" {...form.register("endsAt")} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="location">Location</Label>
+                <Input id="location" placeholder="Room 301, Science Block" {...form.register("location")} />
+              </div>
+              {form.formState.errors.startsAt && (
+                <p className="text-xs text-destructive">{form.formState.errors.startsAt.message}</p>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
-              <p className="text-sm font-medium">Featured event</p>
+              <p className="text-sm font-medium">Featured</p>
               <p className="text-xs text-muted-foreground">Pinned to the top with the club accent color.</p>
             </div>
             <Switch
@@ -137,7 +212,7 @@ export default function LinksTab() {
   const [editing, setEditing] = useState<LinkItem | null>(null);
 
   const links = data?.links ?? [];
-  const accent = data?.profile.accentColor ?? "#6366f1";
+  const accent = data?.profile.theme.palette.accent ?? "#6366f1";
 
   const moveMutation = useMutation({
     mutationFn: reorderLinks,
@@ -169,7 +244,7 @@ export default function LinksTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{links.length} links</p>
+        <p className="text-sm text-muted-foreground">{links.length} items</p>
         <Button
           onClick={() => {
             setEditing(null);
@@ -177,7 +252,7 @@ export default function LinksTab() {
           }}
         >
           <Plus className="h-4 w-4" />
-          Add link
+          Add
         </Button>
       </div>
 
@@ -187,7 +262,7 @@ export default function LinksTab() {
             <TableRow>
               <TableHead className="w-10" />
               <TableHead>Label</TableHead>
-              <TableHead>URL</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead className="w-10">Featured</TableHead>
               <TableHead className="w-28 text-right">Actions</TableHead>
             </TableRow>
@@ -223,7 +298,17 @@ export default function LinksTab() {
                   </div>
                 </TableCell>
                 <TableCell className="font-medium">{link.label}</TableCell>
-                <TableCell className="max-w-[220px] truncate text-muted-foreground">{link.url}</TableCell>
+                <TableCell>
+                  {link.kind === "event" ? (
+                    <Badge variant="secondary" className="gap-1">
+                      <CalendarClock className="h-3 w-3" /> Event
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="gap-1">
+                      <LinkIcon className="h-3 w-3" /> Link
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   {link.highlight === 1 && <Star className="h-4 w-4" style={{ color: accent }} fill="currentColor" />}
                 </TableCell>
