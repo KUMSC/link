@@ -38,6 +38,30 @@ are empty in `.dev.vars`. The public page is at `/`, the dashboard at `/admin`.
 
 ## Deploy
 
+### Option A — Cloudflare UI / GitHub (recommended)
+
+Cloudflare can **auto-provision** the D1 database and R2 bucket for you. In
+`wrangler.jsonc`, `database_id` is intentionally **omitted** so the platform
+creates the resources automatically and injects the real id on deploy.
+
+1. Push this repo to GitHub (done).
+2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import repository**
+   (or use the *Deploy to Cloudflare* button if the repo is public).
+3. Cloudflare clones the repo, **auto-creates `club-link-db` + `club-link-uploads`**,
+   and deploys. Subsequent pushes to the connected branch redeploy automatically.
+4. Apply the schema to the remote database:
+   ```bash
+   npm run db:migrate:remote   # auto-resolves the provisioned D1 id
+   npm run db:seed:remote
+   ```
+5. Set the two secrets (never auto-created):
+   ```bash
+   npx wrangler secret put ACCESS_TEAM_DOMAIN   # e.g. https://yourteam.cloudflareaccess.com
+   npx wrangler secret put ACCESS_AUD           # your Access application AUD tag
+   ```
+
+### Option B — manual CLI
+
 1. **Create D1 + R2 resources** (one-time):
 
 ```bash
@@ -45,7 +69,7 @@ npx wrangler d1 create club-link-db        # → copy the database_id
 npx wrangler r2 bucket create club-link-uploads
 ```
 
-2. Put the D1 `database_id` into `wrangler.jsonc`.
+2. Put the D1 `database_id` into `wrangler.jsonc` (or rely on `scripts/patch-db-id.mjs` to fetch it).
 
 3. Set Access secrets so `/api/admin/*` is protected:
 
@@ -57,8 +81,7 @@ npx wrangler secret put ACCESS_AUD           # your Access application AUD tag
 4. Deploy:
 
 ```bash
-npm run build        # regenerates public/og.png, then builds worker + SPA
-npx wrangler deploy
+npm run deploy       # regenerates public/og.png, then builds worker + SPA and deploys
 ```
 
 5. Apply the schema to the remote D1:
@@ -67,6 +90,10 @@ npx wrangler deploy
 npm run db:migrate:remote
 npm run db:seed:remote
 ```
+
+> `db:migrate:remote` runs `scripts/patch-db-id.mjs` first, which fetches the
+> D1 database id from your account if it isn't in the config yet — so the
+> command works whether you created the DB manually or it was auto-provisioned.
 
 ## Protecting /admin with Cloudflare Access
 

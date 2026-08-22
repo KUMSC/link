@@ -11,7 +11,7 @@
     "deploy": "npm run build && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply club-link-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply club-link-db --remote",
+    "db:migrate:remote": "node scripts/patch-db-id.mjs && wrangler d1 migrations apply club-link-db --remote",
     "db:seed:local": "wrangler d1 execute club-link-db --local --file=./migrations/seed.sql",
     "db:seed:remote": "wrangler d1 execute club-link-db --remote --file=./migrations/seed.sql"
   },
