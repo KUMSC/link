@@ -2,11 +2,14 @@
  * On-demand schema initialization.
  *
  * When D1 is auto-provisioned (GitHub / Deploy-to-Cloudflare flow) the database
- * is empty — no tables exist. The first request would otherwise 500 on every
- * query. `ensureSchema` creates the tables + singleton profile row lazily and
- * caches the result per isolate, so it only runs once.
+ * is empty — no tables exist. `ensureSchema` creates everything lazily and
+ * caches per isolate. For already-provisioned DBs (rolled out before new
+ * columns existed) it also idempotently adds missing columns via
+ * `pragma_table_info` + guarded `ALTER TABLE ADD COLUMN`, so both fresh and
+ * existing deployments converge on the same schema.
  */
-const SCHEMA_STATEMENTS = [
+
+const CREATE_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     org_name TEXT NOT NULL DEFAULT '',
@@ -37,10 +40,48 @@ const SCHEMA_STATEMENTS = [
   `INSERT OR IGNORE INTO profile (id) VALUES (1)`,
 ];
 
+// Columns to backfill on existing databases (table -> [column defs]).
+const COLUMN_ADDITIONS: Record<string, string[]> = {
+  profile: ["theme TEXT NOT NULL DEFAULT '{}'"],
+  links: [
+    "kind TEXT NOT NULL DEFAULT 'link'",
+    "starts_at INTEGER",
+    "ends_at INTEGER",
+    "location TEXT",
+  ],
+  clicks: ["country TEXT", "device TEXT", "visitor_hash TEXT"],
+};
+
+const EXTRA_CREATES = [
+  `CREATE TABLE IF NOT EXISTS views (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visitor_hash TEXT NOT NULL,
+    viewed_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    referer TEXT,
+    country TEXT,
+    device TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_views_time ON views(viewed_at)`,
+];
+
 let initialized = false;
 
 export async function ensureSchema(db: D1Database): Promise<void> {
   if (initialized) return;
-  await db.batch(SCHEMA_STATEMENTS.map((sql) => db.prepare(sql)));
+
+  await db.batch([...CREATE_STATEMENTS, ...EXTRA_CREATES].map((sql) => db.prepare(sql)));
+
+  for (const [table, columns] of Object.entries(COLUMN_ADDITIONS)) {
+    const existing = await db.prepare(`SELECT name FROM pragma_table_info(?)`).bind(table).all();
+    const names = new Set((existing.results as { name: string }[]).map((r) => r.name));
+    const adds = columns.filter((def) => {
+      const col = def.split(" ")[0]!;
+      return !names.has(col);
+    });
+    if (adds.length > 0) {
+      await db.batch(adds.map((def) => db.prepare(`ALTER TABLE ${table} ADD COLUMN ${def}`)));
+    }
+  }
+
   initialized = true;
 }

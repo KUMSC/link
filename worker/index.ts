@@ -5,14 +5,19 @@ import {
   clearAvatarKey,
   createLink,
   deleteLink,
+  getAllClicks,
+  getBreakdown,
   getClickTotals,
   getDailyClicks,
   getLink,
   getLinks,
   getProfile,
   getTotalClicks,
-  reorderLinks,
+  getTotalViews,
+  getUniqueVisitors,
   recordClick,
+  recordView,
+  reorderLinks,
   setAvatarKey,
   updateLink,
   updateProfile,
@@ -20,6 +25,9 @@ import {
 import { injectBootstrap, injectMeta } from "./meta";
 import { ensureSchema } from "./schema";
 import { logger } from "./log";
+import { cachePublic, detectDevice, getCachedPublic, invalidatePublicCache, nullable, visitorHash } from "./util";
+import type { Theme } from "../src/lib/types";
+import { parseTheme } from "../src/lib/types";
 
 type Bindings = Env;
 
@@ -55,9 +63,27 @@ app.onError((err, c) => {
   return c.json({ error: "Internal Server Error" }, 500);
 });
 
+async function loadPublic(env: Env) {
+  const [profile, links] = await Promise.all([getProfile(env.DB), getLinks(env.DB)]);
+  return { profile, links };
+}
+
 // SPA shell with live OG meta injected. Served before static assets on "/".
 app.get("/", async (c) => {
-  const [profile, links] = await Promise.all([getProfile(c.env.DB), getLinks(c.env.DB)]);
+  const { profile, links } = await loadPublic(c.env);
+  // Record a page view (fire-and-forget) using a privacy-friendly hash.
+  c.executionCtx.waitUntil(
+    (async () => {
+      const hash = await visitorHash(c.req.raw);
+      const ua = nullable(c.req.header("User-Agent"));
+      await recordView(c.env.DB, {
+        visitorHash: hash,
+        referer: nullable(c.req.header("Referer")),
+        country: (c.req.raw as Request & { cf?: { country?: string | null } }).cf?.country ?? null,
+        device: detectDevice(ua),
+      });
+    })(),
+  );
   const origin = new URL(c.req.url).origin;
   const assetRes = await c.env.ASSETS.fetch(c.req.raw);
   let html = await assetRes.text();
@@ -66,8 +92,6 @@ app.get("/", async (c) => {
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      // Never cache the HTML shell: it references hashed assets and must always
-      // point at the current deployment, or the SPA 404s on old hashes.
       "Cache-Control": "no-store, max-age=0",
     },
   });
@@ -76,8 +100,12 @@ app.get("/", async (c) => {
 // ---- Public API ----------------------------------------------------------
 
 app.get("/api/public", async (c) => {
-  const [profile, links] = await Promise.all([getProfile(c.env.DB), getLinks(c.env.DB)]);
-  return c.json({ profile, links });
+  // Serve from KV cache when fresh, else compute + cache.
+  const cached = await getCachedPublic<{ profile: unknown; links: unknown }>(c.env);
+  if (cached) return c.json(cached);
+  const data = await loadPublic(c.env);
+  c.executionCtx.waitUntil(cachePublic(c.env, data));
+  return c.json(data);
 });
 
 app.get("/api/avatar", async (c) => {
@@ -98,7 +126,14 @@ app.get("/api/click/:id", async (c) => {
   if (!link) return c.notFound();
   c.executionCtx.waitUntil(
     (async () => {
-      await recordClick(c.env.DB, id, c.req.header("Referer") ?? null);
+      const hash = await visitorHash(c.req.raw);
+      const ua = nullable(c.req.header("User-Agent"));
+      await recordClick(c.env.DB, id, {
+        referer: nullable(c.req.header("Referer")),
+        country: (c.req.raw as Request & { cf?: { country?: string | null } }).cf?.country ?? null,
+        device: detectDevice(ua),
+        visitorHash: hash,
+      });
       logger.info("link_click", { link_id: id, label: link.label });
     })(),
   );
@@ -130,13 +165,16 @@ app.put("/api/admin/profile", async (c) => {
     tagline?: string;
     accentColor?: string;
     socials?: unknown;
+    theme?: Theme;
   }>();
   const profile = await updateProfile(c.env.DB, {
     orgName: body.orgName,
     tagline: body.tagline,
     accentColor: body.accentColor,
     socials: body.socials,
+    theme: body.theme ? parseTheme(JSON.stringify(body.theme)) : undefined,
   });
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("profile_updated", { email: c.get("email"), fields: Object.keys(body) });
   return c.json({ profile });
 });
@@ -155,6 +193,7 @@ app.post("/api/admin/avatar", async (c) => {
     await c.env.UPLOADS.delete(profile.avatarKey).catch(() => {});
   }
   await setAvatarKey(c.env.DB, key);
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("avatar_uploaded", { email: c.get("email"), key });
   return c.json({ key });
 });
@@ -165,33 +204,55 @@ app.delete("/api/admin/avatar", async (c) => {
     await c.env.UPLOADS.delete(profile.avatarKey).catch(() => {});
   }
   await clearAvatarKey(c.env.DB);
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("avatar_removed", { email: c.get("email") });
   return c.json({ ok: true });
 });
 
+interface LinkBody {
+  label?: string;
+  url?: string;
+  icon?: string | null;
+  highlight?: boolean;
+  kind?: "link" | "event";
+  startsAt?: number | null;
+  endsAt?: number | null;
+  location?: string | null;
+}
+
 app.post("/api/admin/links", async (c) => {
-  const body = await c.req.json<{ label: string; url: string; icon?: string | null; highlight?: boolean }>();
+  const body = await c.req.json<LinkBody>();
   if (!body.label?.trim() || !body.url?.trim()) return c.json({ error: "label and url are required" }, 400);
   const link = await createLink(c.env.DB, {
     label: body.label.trim(),
     url: body.url.trim(),
     icon: body.icon,
     highlight: body.highlight,
+    kind: body.kind,
+    startsAt: body.startsAt,
+    endsAt: body.endsAt,
+    location: body.location,
   });
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("link_created", { email: c.get("email"), link_id: link.id, label: link.label });
   return c.json({ link });
 });
 
 app.put("/api/admin/links/:id", async (c) => {
   const id = Number(c.req.param("id"));
-  const body = await c.req.json<{ label?: string; url?: string; icon?: string | null; highlight?: boolean }>();
+  const body = await c.req.json<LinkBody>();
   const link = await updateLink(c.env.DB, id, {
     label: body.label?.trim(),
     url: body.url?.trim(),
     icon: body.icon,
     highlight: body.highlight,
+    kind: body.kind,
+    startsAt: body.startsAt,
+    endsAt: body.endsAt,
+    location: body.location,
   });
   if (!link) return c.notFound();
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("link_updated", { email: c.get("email"), link_id: id });
   return c.json({ link });
 });
@@ -199,6 +260,7 @@ app.put("/api/admin/links/:id", async (c) => {
 app.delete("/api/admin/links/:id", async (c) => {
   const id = Number(c.req.param("id"));
   await deleteLink(c.env.DB, id);
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("link_deleted", { email: c.get("email"), link_id: id });
   return c.body(null, 204);
 });
@@ -207,16 +269,61 @@ app.post("/api/admin/links/reorder", async (c) => {
   const body = await c.req.json<{ ids: number[] }>();
   if (!Array.isArray(body.ids)) return c.json({ error: "ids required" }, 400);
   await reorderLinks(c.env.DB, body.ids);
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   return c.json({ ok: true });
 });
 
 app.get("/api/admin/stats", async (c) => {
-  const [totals, daily, total] = await Promise.all([
+  const rangeParam = c.req.query("days");
+  const rangeDays = rangeParam === "all" ? -1 : Number(rangeParam ?? 30) || 30;
+
+  const [totals, daily, total, views, uniques, referrers, countries, devices] = await Promise.all([
     getClickTotals(c.env.DB),
-    getDailyClicks(c.env.DB, 30),
-    getTotalClicks(c.env.DB),
+    getDailyClicks(c.env.DB, rangeDays > 0 ? rangeDays : 30),
+    getTotalClicks(c.env.DB, rangeDays > 0 ? rangeDays : undefined),
+    getTotalViews(c.env.DB, rangeDays > 0 ? rangeDays : undefined),
+    getUniqueVisitors(c.env.DB, rangeDays > 0 ? rangeDays : undefined),
+    getBreakdown(c.env.DB, "referer", "clicks", rangeDays > 0 ? rangeDays : 3650, 10),
+    getBreakdown(c.env.DB, "country", "clicks", rangeDays > 0 ? rangeDays : 3650, 10),
+    getBreakdown(c.env.DB, "device", "clicks", rangeDays > 0 ? rangeDays : 3650, 10),
   ]);
-  return c.json({ totals, daily, total });
+  const ctr = views > 0 ? Math.round((total / views) * 1000) / 10 : 0;
+
+  return c.json({
+    totals,
+    daily,
+    total,
+    views,
+    uniques,
+    ctr,
+    referrers,
+    countries,
+    devices,
+    rangeDays,
+  });
+});
+
+app.get("/api/admin/stats/export", async (c) => {
+  const rangeParam = c.req.query("days");
+  const rangeDays = rangeParam === "all" ? 3650 : Number(rangeParam ?? 30) || 30;
+  const rows = await getAllClicks(c.env.DB, rangeDays);
+  const csv = [
+    "id,link,clicked_at,referer,country,device",
+    ...rows.map((r) =>
+      [
+        r.id,
+        `"${String(r.link).replace(/"/g, '""')}"`,
+        r.clicked_at,
+        `"${String(r.referer ?? "").replace(/"/g, '""')}"`,
+        String(r.country ?? ""),
+        String(r.device ?? ""),
+      ].join(","),
+    ),
+  ].join("\n");
+  return c.body(csv, 200, {
+    "Content-Type": "text/csv; charset=utf-8",
+    "Content-Disposition": `attachment; filename="clicks-${rangeDays}d.csv"`,
+  });
 });
 
 // ---- Fallbacks -----------------------------------------------------------

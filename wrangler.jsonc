@@ -23,5 +23,11 @@
       "binding": "UPLOADS",
       "bucket_name": "club-link-uploads"
     }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "00000000000000000000000000000000"
+    }
   ]
 }
