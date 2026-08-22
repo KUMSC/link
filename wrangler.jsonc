@@ -23,11 +23,8 @@
       "binding": "UPLOADS",
       "bucket_name": "club-link-uploads"
     }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "CACHE",
-      "id": "00000000000000000000000000000000"
-    }
   ]
+  // Optional KV caching: KV namespaces are NOT auto-provisioned (unlike D1/R2).
+  // To enable, run:  npx wrangler kv namespace create CACHE
+  // then add:        "kv_namespaces": [{ "binding": "CACHE", "id": "<the id>" }]
 }

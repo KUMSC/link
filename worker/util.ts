@@ -1,23 +1,31 @@
 import type { Env } from "./env";
 
-/** 30s KV cache TTL for the public payload (free tier min TTL). */
+/**
+ * KV caching of the public payload is optional: it activates when the CACHE
+ * binding exists. Cloudflare auto-provisions D1 and R2, but NOT KV namespaces
+ * — so the app must deploy (and run) fine without one.
+ */
+const CACHE_KEY = "public";
+/** 30s TTL for the public payload (free tier min TTL). */
 export const PUBLIC_CACHE_TTL = 30;
 
 export async function getCachedPublic<T>(env: Env): Promise<T | null> {
-  const raw = await env.CACHE.get("public", "text").catch(() => null);
+  if (!env.CACHE) return null;
+  const raw = await env.CACHE.get(CACHE_KEY, "text").catch(() => null);
   return raw ? (JSON.parse(raw) as T) : null;
 }
 
 export async function cachePublic(env: Env, data: unknown): Promise<void> {
-  await env.CACHE.put("public", JSON.stringify(data), { expirationTtl: PUBLIC_CACHE_TTL }).catch(() => {});
+  if (!env.CACHE) return;
+  await env.CACHE.put(CACHE_KEY, JSON.stringify(data), { expirationTtl: PUBLIC_CACHE_TTL }).catch(() => {});
 }
 
 export async function invalidatePublicCache(env: Env): Promise<void> {
-  await env.CACHE.delete("public").catch(() => {});
+  if (!env.CACHE) return;
+  await env.CACHE.delete(CACHE_KEY).catch(() => {});
 }
 
-const DEVICE_RE =
-  /(android|iphone|ipad|ipod|mobile)/i;
+const DEVICE_RE = /(android|iphone|ipad|ipod|mobile)/i;
 const MOBILE_RE = /(android|iphone|ipod)/i;
 const TABLET_RE = /(ipad)/i;
 
