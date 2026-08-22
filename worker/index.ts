@@ -63,7 +63,9 @@ app.get("/", async (c) => {
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=60",
+      // Never cache the HTML shell: it references hashed assets and must always
+      // point at the current deployment, or the SPA 404s on old hashes.
+      "Cache-Control": "no-store, max-age=0",
     },
   });
 });

@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { getAdminData, updateProfile, uploadAvatar } from "../../lib/api";
 import { PLATFORM_LABELS, SOCIAL_PLATFORMS, validateUrl } from "../../lib/platforms";
 import type { PlatformId } from "../../lib/types";
@@ -37,10 +37,12 @@ export default function BrandingTab() {
   const [newUrl, setNewUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: { orgName: "", tagline: "", accentColor: "#6366f1" },
+    mode: "onChange",
   });
 
   useEffect(() => {
@@ -55,15 +57,69 @@ export default function BrandingTab() {
     }
   }, [data, form]);
 
-  const profileMutation = useMutation({
-    mutationFn: (values: ProfileForm) =>
-      updateProfile({ ...values, socials: socials.filter((s) => s.url.trim()) }),
+  const saveMutation = useMutation({
+    mutationFn: (values: { orgName: string; tagline: string; accentColor: string; socials: SocialRow[] }) =>
+      updateProfile({ ...values, socials: values.socials.filter((s) => s.url.trim()) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
-      toast.success("Profile saved");
+      setSaveState("saved");
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Save failed"),
+    onError: (e) => {
+      setSaveState("idle");
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    },
   });
+
+  // Debounced auto-save: watches form values + socials, saves ~800ms after the last change.
+  const socialsRef = useRef(socials);
+  socialsRef.current = socials;
+  const saveStateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const sub = form.watch(() => {
+      if (saveStateTimer.current) clearTimeout(saveStateTimer.current);
+      setSaveState("saving");
+      saveStateTimer.current = setTimeout(() => {
+        const current = form.getValues();
+        if (!form.formState.isValid) {
+          setSaveState("idle");
+          return;
+        }
+        saveMutation.mutate({
+          orgName: current.orgName,
+          tagline: current.tagline,
+          accentColor: current.accentColor,
+          socials: socialsRef.current,
+        });
+      }, 800);
+    });
+    return () => sub.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Socials edits bypass the form, so trigger the same debounced save on change.
+  const socialsInitial = useRef(socials);
+  useEffect(() => {
+    if (socialsInitial.current === socials) {
+      socialsInitial.current = socials;
+      return;
+    }
+    socialsInitial.current = socials;
+    if (saveStateTimer.current) clearTimeout(saveStateTimer.current);
+    setSaveState("saving");
+    saveStateTimer.current = setTimeout(() => {
+      const current = form.getValues();
+      if (!form.formState.isValid) {
+        setSaveState("idle");
+        return;
+      }
+      saveMutation.mutate({
+        orgName: current.orgName,
+        tagline: current.tagline,
+        accentColor: current.accentColor,
+        socials: socialsRef.current,
+      });
+    }, 800);
+  }, [socials]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const avatarMutation = useMutation({
     mutationFn: uploadAvatar,
@@ -88,14 +144,32 @@ export default function BrandingTab() {
     setNewUrl("");
   };
 
+  const SaveIndicator = () => (
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {saveState === "saving" && (
+        <>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+        </>
+      )}
+      {saveState === "saved" && (
+        <>
+          <Check className="h-3.5 w-3.5 text-emerald-600" /> Saved
+        </>
+      )}
+    </span>
+  );
+
   return (
     <div className="flex flex-col gap-8">
       {/* Profile */}
       <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-        <h2 className="text-base font-semibold">Profile</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">Profile</h2>
+          <SaveIndicator />
+        </div>
         <div className="grid gap-2">
           <Label htmlFor="orgName">Organization name</Label>
-          <Input id="orgName" placeholder="My Club" {...form.register("orgName")} />
+          <Input id="orgName" placeholder="Your organization" {...form.register("orgName")} />
           {form.formState.errors.orgName && (
             <p className="text-xs text-destructive">{form.formState.errors.orgName.message}</p>
           )}
@@ -119,12 +193,6 @@ export default function BrandingTab() {
               onChange={(e) => form.setValue("accentColor", e.target.value)}
             />
           </div>
-        </div>
-        <div className="mt-2 flex justify-end">
-          <Button onClick={() => form.handleSubmit((v) => profileMutation.mutate(v))()} disabled={profileMutation.isPending}>
-            {profileMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Save profile
-          </Button>
         </div>
       </section>
 
@@ -170,7 +238,10 @@ export default function BrandingTab() {
 
       {/* Socials */}
       <section className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-        <h2 className="text-base font-semibold">Social links</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">Social links</h2>
+          <SaveIndicator />
+        </div>
         {socials.length === 0 && <p className="text-sm text-muted-foreground">No social links yet.</p>}
         <div className="flex flex-col gap-2">
           {socials.map((s, i) => (
@@ -210,7 +281,7 @@ export default function BrandingTab() {
           </Select>
           <Input
             className="flex-1 font-mono text-xs"
-            placeholder="https://instagram.com/yourclub"
+            placeholder="https://instagram.com/yourhandle"
             value={newUrl}
             onChange={(e) => setNewUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addSocial()}

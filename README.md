@@ -1,4 +1,4 @@
-# Club Link
+# Link in Bio
 
 A self-hostable link-in-bio platform for clubs and organizations, built 100% on Cloudflare's free tier. Deploy your own copy, set your branding, and share event forms, socials, and links from one page you own.
 
