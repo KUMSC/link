@@ -113,6 +113,22 @@ export async function deleteLink(id: number): Promise<void> {
   if (!res.ok) throw new Error("Failed to delete link");
 }
 
+export async function uploadThumbnail(linkId: number, file: File): Promise<{ key: string }> {
+  const form = new FormData();
+  form.append("thumbnail", file);
+  return parse(
+    fetch(`${BASE}/admin/links/${linkId}/thumbnail`, {
+      method: "POST",
+      body: form,
+    }),
+  );
+}
+
+export async function removeThumbnail(linkId: number): Promise<void> {
+  const res = await fetch(`${BASE}/admin/links/${linkId}/thumbnail`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to remove thumbnail");
+}
+
 export async function reorderLinks(ids: number[]): Promise<void> {
   const res = await fetch(`${BASE}/admin/links/reorder`, {
     method: "POST",

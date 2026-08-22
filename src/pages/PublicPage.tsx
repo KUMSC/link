@@ -93,9 +93,17 @@ function EventCard({ link, accent }: { link: LinkItem; accent: string }) {
       className="group relative flex items-center gap-3 overflow-hidden rounded-2xl px-5 py-4 text-left text-white shadow-lg transition-all hover:-translate-y-1 hover:shadow-2xl"
       style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)` }}
     >
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20">
-        <CalendarClock className="h-5 w-5" />
-      </div>
+            {link.thumbnailKey ? (
+        <img
+          src={`/api/thumb/${link.id}`}
+          alt=""
+          className="h-14 w-14 shrink-0 rounded-xl object-cover ring-2 ring-white/30"
+        />
+      ) : (
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20">
+          <CalendarClock className="h-5 w-5" />
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-semibold">{link.label}</p>
         <p className="mt-0.5 flex items-center gap-1 text-xs text-white/85">
@@ -130,12 +138,17 @@ function LinkCard({ link, accent, featured }: { link: LinkItem; accent: string; 
   return (
     <a
       href={`/api/click/${link.id}`}
-      className="group relative flex items-center justify-center gap-2.5 rounded-2xl border px-6 py-4 text-[15px] font-medium shadow-sm backdrop-blur transition-all hover:-translate-y-1 hover:shadow-xl"
+      className={`group relative flex items-center gap-3 rounded-2xl border px-5 py-4 text-[15px] font-medium shadow-sm backdrop-blur transition-all hover:-translate-y-1 hover:shadow-xl ${
+        link.thumbnailKey ? "justify-start text-left" : "justify-center"
+      }`}
       style={{ borderColor: "color-mix(in srgb, var(--text) 15%, transparent)", color: "var(--text)", background: "var(--surface)" }}
       onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.boxShadow = `0 20px 45px -12px ${accent}55`)}
       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.boxShadow = "")}
     >
-      <span>{link.label}</span>
+      {link.thumbnailKey && (
+        <img src={`/api/thumb/${link.id}`} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
+      )}
+      <span className="min-w-0 truncate">{link.label}</span>
       <ArrowUpRight className="absolute right-5 h-4.5 w-4.5 opacity-30 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100" />
     </a>
   );
@@ -156,11 +169,13 @@ function EmptyState({ accent }: { accent: string }) {
  *  `embedded` renders inside a container (no min-height, no own scroll) so it can
  *  sit in the admin's preview pane without fighting its layout. */
 export function PageShell({ data, interactive = true, embedded = false }: { data: PageData; interactive?: boolean; embedded?: boolean }) {
-  const { theme, cssVars } = useTheme();
+    const { theme, cssVars } = useTheme();
   const { profile, links } = data;
-  const featured = links.filter((l) => l.highlight === 1);
+  // Mutually exclusive partitions — an item must render exactly once.
+  // Featured takes priority; events always render as event cards otherwise.
+  const featured = links.filter((l) => l.highlight === 1 && l.kind !== "event");
   const events = links.filter((l) => l.kind === "event");
-  const regular = links.filter((l) => l.kind !== "event" && l.highlight === 0);
+  const regular = links.filter((l) => l.highlight !== 1 && l.kind !== "event");
   const accent = theme.palette.accent;
   const configured = !!(profile.orgName || links.length > 0 || profile.socials.length > 0);
 

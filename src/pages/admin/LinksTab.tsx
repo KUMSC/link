@@ -1,11 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, CalendarClock, Link as LinkIcon, Pencil, Plus, Star, Trash2 } from "lucide-react";
-import { createLink, deleteLink, getAdminData, reorderLinks, updateLink } from "../../lib/api";
+import {
+  ArrowDown,
+  ArrowUp,
+  CalendarClock,
+  ImagePlus,
+  Link as LinkIcon,
+  Pencil,
+  Plus,
+  Star,
+  Trash2,
+} from "lucide-react";
+import {
+  createLink,
+  deleteLink,
+  getAdminData,
+  removeThumbnail,
+  reorderLinks,
+  updateLink,
+  uploadThumbnail,
+} from "../../lib/api";
 import { validateUrl } from "../../lib/platforms";
 import type { LinkItem, LinkKind } from "../../lib/types";
 import { Button } from "../../components/ui/button";
@@ -86,6 +104,9 @@ function LinkEditor({
     resolver: zodResolver(linkSchema),
     defaultValues: { label: "", url: "", highlight: false, kind: "link" },
   });
+  const [thumbFile, setThumbFile] = useState<File | null>(null);
+  const [thumbPreview, setThumbPreview] = useState<string | null>(null);
+  const thumbRemoved = useRef(false);
 
   useEffect(() => {
     if (open) {
@@ -98,10 +119,31 @@ function LinkEditor({
         endsAt: toLocal(editing?.endsAt),
         location: editing?.location ?? "",
       });
+      setThumbFile(null);
+      setThumbPreview(editing?.thumbnailKey ? `/api/thumb/${editing.id}` : null);
+      thumbRemoved.current = false;
     }
   }, [open, editing, form]);
 
   const watchedKind = form.watch("kind");
+  const hasThumb = !!(thumbPreview || (editing?.thumbnailKey && !thumbRemoved.current));
+
+  const pickThumb = (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5MB");
+      return;
+    }
+    setThumbFile(file);
+    setThumbPreview(URL.createObjectURL(file));
+    thumbRemoved.current = false;
+  };
+
+  const clearThumb = () => {
+    setThumbFile(null);
+    setThumbPreview(null);
+    thumbRemoved.current = true;
+  };
 
   const mutation = useMutation({
     mutationFn: async (values: LinkForm) => {
@@ -114,8 +156,16 @@ function LinkEditor({
         endsAt: toUnix(values.endsAt),
         location: values.location?.trim() || null,
       };
-      if (editing) return updateLink(editing.id, payload);
-      return createLink(payload);
+      const result = editing ? await updateLink(editing.id, payload) : await createLink(payload);
+      // Thumbnail follows the link row: upload a newly picked file, or remove
+      // an existing one when the user cleared it.
+      const id = result.link.id;
+      if (thumbFile) {
+        await uploadThumbnail(id, thumbFile);
+      } else if (thumbRemoved.current && editing?.thumbnailKey) {
+        await removeThumbnail(id);
+      }
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
@@ -158,6 +208,39 @@ function LinkEditor({
             <Input id="url" placeholder="https://forms.google.com/…" {...form.register("url")} />
             {form.formState.errors.url && (
               <p className="text-xs text-destructive">{form.formState.errors.url.message}</p>
+            )}
+          </div>
+
+          {/* Thumbnail */}
+          <div className="flex items-center gap-3 rounded-lg border p-3">
+            <div
+              className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border"
+              style={{ background: "var(--muted, oklch(0.97 0 0))" }}
+              aria-hidden
+            >
+              {thumbPreview ? (
+                <img src={thumbPreview} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <ImagePlus className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <p className="text-sm font-medium">Thumbnail</p>
+              <label className="cursor-pointer text-xs font-medium text-muted-foreground underline-offset-2 hover:underline">
+                {hasThumb ? "Replace image" : "Choose image"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  className="sr-only"
+                  onChange={(e) => pickThumb(e.target.files?.[0])}
+                />
+              </label>
+              <p className="text-[11px] text-muted-foreground">PNG/JPG/WebP · up to 5MB · shown on the card</p>
+            </div>
+            {hasThumb && (
+              <Button type="button" variant="outline" size="icon" onClick={clearThumb} aria-label="Remove thumbnail">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
             )}
           </div>
 

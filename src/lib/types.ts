@@ -84,6 +84,7 @@ export interface LinkItem {
   startsAt: number | null;
   endsAt: number | null;
   location: string | null;
+  thumbnailKey: string | null;
   createdAt: number;
 }
 

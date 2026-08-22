@@ -119,6 +119,20 @@ app.get("/api/avatar", async (c) => {
   return new Response(obj.body, { headers });
 });
 
+// Public thumbnail for a link/event card: /api/thumb/:id
+app.get("/api/thumb/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.notFound();
+  const link = await getLink(c.env.DB, id);
+  if (!link?.thumbnailKey) return c.notFound();
+  const obj = await c.env.UPLOADS.get(link.thumbnailKey);
+  if (!obj) return c.notFound();
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set("Cache-Control", "public, max-age=3600");
+  return new Response(obj.body, { headers });
+});
+
 app.get("/api/click/:id", async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id)) return c.notFound();
@@ -218,6 +232,13 @@ interface LinkBody {
   startsAt?: number | null;
   endsAt?: number | null;
   location?: string | null;
+  thumbnailKey?: string | null;
+}
+
+/** Deletes an R2 object, tolerating a missing object. */
+async function deleteAsset(env: Env, key: string | null | undefined): Promise<void> {
+  if (!key) return;
+  await env.UPLOADS.delete(key).catch(() => {});
 }
 
 app.post("/api/admin/links", async (c) => {
@@ -232,6 +253,7 @@ app.post("/api/admin/links", async (c) => {
     startsAt: body.startsAt,
     endsAt: body.endsAt,
     location: body.location,
+    thumbnailKey: body.thumbnailKey,
   });
   c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("link_created", { email: c.get("email"), link_id: link.id, label: link.label });
@@ -241,6 +263,7 @@ app.post("/api/admin/links", async (c) => {
 app.put("/api/admin/links/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const body = await c.req.json<LinkBody>();
+  const previous = await getLink(c.env.DB, id);
   const link = await updateLink(c.env.DB, id, {
     label: body.label?.trim(),
     url: body.url?.trim(),
@@ -250,18 +273,60 @@ app.put("/api/admin/links/:id", async (c) => {
     startsAt: body.startsAt,
     endsAt: body.endsAt,
     location: body.location,
+    thumbnailKey: body.thumbnailKey,
   });
   if (!link) return c.notFound();
+  // Replace-then-cleanup: drop the old thumbnail when it changed or was removed.
+  if (previous?.thumbnailKey && previous.thumbnailKey !== link.thumbnailKey) {
+    c.executionCtx.waitUntil(deleteAsset(c.env, previous.thumbnailKey));
+  }
   c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("link_updated", { email: c.get("email"), link_id: id });
   return c.json({ link });
 });
 
+// Per-link thumbnail upload. Replaces (and deletes) any existing thumbnail.
+app.post("/api/admin/links/:id/thumbnail", async (c) => {
+  const id = Number(c.req.param("id"));
+  const link = await getLink(c.env.DB, id);
+  if (!link) return c.notFound();
+  const body = await c.req.parseBody();
+  const file = body["thumbnail"];
+  if (!(file instanceof File)) return c.json({ error: "missing thumbnail file" }, 400);
+  if (file.size > 5 * 1024 * 1024) return c.json({ error: "image must be under 5MB" }, 400);
+  const ext = file.name.split(".").pop() ?? "png";
+  const key = `thumb-${id}-${Date.now()}.${ext}`;
+  await c.env.UPLOADS.put(key, file.stream(), {
+    httpMetadata: { contentType: file.type },
+  });
+  await updateLink(c.env.DB, id, { thumbnailKey: key });
+  if (link.thumbnailKey && link.thumbnailKey !== key) {
+    c.executionCtx.waitUntil(deleteAsset(c.env, link.thumbnailKey));
+  }
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
+  logger.info("thumbnail_uploaded", { email: c.get("email"), link_id: id, key });
+  return c.json({ key });
+});
+
+app.delete("/api/admin/links/:id/thumbnail", async (c) => {
+  const id = Number(c.req.param("id"));
+  const link = await getLink(c.env.DB, id);
+  if (!link) return c.notFound();
+  await updateLink(c.env.DB, id, { thumbnailKey: null });
+  c.executionCtx.waitUntil(deleteAsset(c.env, link.thumbnailKey));
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
+  logger.info("thumbnail_removed", { email: c.get("email"), link_id: id });
+  return c.json({ ok: true });
+});
+
 app.delete("/api/admin/links/:id", async (c) => {
   const id = Number(c.req.param("id"));
+  // Delete the link's associated assets (thumbnail) along with the row.
+  const link = await getLink(c.env.DB, id);
   await deleteLink(c.env.DB, id);
+  if (link) c.executionCtx.waitUntil(deleteAsset(c.env, link.thumbnailKey));
   c.executionCtx.waitUntil(invalidatePublicCache(c.env));
-  logger.info("link_deleted", { email: c.get("email"), link_id: id });
+  logger.info("link_deleted", { email: c.get("email"), link_id: id, thumbnail_deleted: !!link?.thumbnailKey });
   return c.body(null, 204);
 });
 

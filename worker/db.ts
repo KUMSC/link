@@ -26,12 +26,14 @@ function mapLink(row: Record<string, unknown>): LinkItem {
     startsAt: (row.starts_at as number | null) ?? null,
     endsAt: (row.ends_at as number | null) ?? null,
     location: (row.location as string | null) ?? null,
+    thumbnailKey: (row.thumbnail_key as string | null) ?? null,
     createdAt: row.created_at as number,
   };
 }
 
 const PROFILE_COLS = "id, org_name, tagline, avatar_key, accent_color, socials, theme, updated_at";
-const LINK_COLS = "id, label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location, created_at";
+const LINK_COLS =
+  "id, label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location, thumbnail_key, created_at";
 
 export async function getProfile(db: D1Database): Promise<Profile> {
   const res = await db.prepare(`SELECT ${PROFILE_COLS} FROM profile WHERE id = 1`).first();
@@ -95,6 +97,7 @@ export interface LinkCreate {
   startsAt?: number | null;
   endsAt?: number | null;
   location?: string | null;
+  thumbnailKey?: string | null;
 }
 
 export async function createLink(db: D1Database, fields: LinkCreate): Promise<LinkItem> {
@@ -102,8 +105,8 @@ export async function createLink(db: D1Database, fields: LinkCreate): Promise<Li
   const nextSort = ((count?.n as number) ?? 0) + 1;
   const res = await db
     .prepare(
-      `INSERT INTO links (label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO links (label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location, thumbnail_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING ${LINK_COLS}`,
     )
     .bind(
@@ -116,6 +119,7 @@ export async function createLink(db: D1Database, fields: LinkCreate): Promise<Li
       fields.startsAt ?? null,
       fields.endsAt ?? null,
       fields.location ?? null,
+      fields.thumbnailKey ?? null,
     )
     .first();
   return mapLink(res as Record<string, unknown>);
@@ -130,6 +134,7 @@ export interface LinkUpdate {
   startsAt?: number | null;
   endsAt?: number | null;
   location?: string | null;
+  thumbnailKey?: string | null;
 }
 
 export async function updateLink(db: D1Database, id: number, fields: LinkUpdate): Promise<LinkItem | null> {
@@ -137,7 +142,7 @@ export async function updateLink(db: D1Database, id: number, fields: LinkUpdate)
   if (!current) return null;
   await db
     .prepare(
-      "UPDATE links SET label = ?, url = ?, icon = ?, highlight = ?, kind = ?, starts_at = ?, ends_at = ?, location = ? WHERE id = ?",
+      "UPDATE links SET label = ?, url = ?, icon = ?, highlight = ?, kind = ?, starts_at = ?, ends_at = ?, location = ?, thumbnail_key = ? WHERE id = ?",
     )
     .bind(
       fields.label ?? current.label,
@@ -148,6 +153,7 @@ export async function updateLink(db: D1Database, id: number, fields: LinkUpdate)
       fields.startsAt === undefined ? current.startsAt : fields.startsAt,
       fields.endsAt === undefined ? current.endsAt : fields.endsAt,
       fields.location === undefined ? current.location : fields.location,
+      fields.thumbnailKey === undefined ? current.thumbnailKey : fields.thumbnailKey,
       id,
     )
     .run();
