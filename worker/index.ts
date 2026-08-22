@@ -17,6 +17,7 @@ import {
   updateProfile,
 } from "./db";
 import { injectMeta } from "./meta";
+import { ensureSchema } from "./schema";
 
 type Bindings = Env;
 
@@ -26,6 +27,12 @@ type AppEnv = {
 };
 
 const app = new Hono<AppEnv>();
+
+// Self-heal on an empty (auto-provisioned) D1 before any DB-backed route runs.
+app.use("*", async (c, next) => {
+  await ensureSchema(c.env.DB);
+  await next();
+});
 
 // SPA shell with live OG meta injected. Served before static assets on "/".
 app.get("/", async (c) => {
