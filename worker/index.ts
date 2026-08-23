@@ -127,23 +127,63 @@ app.get("/api/public", async (c) => {
 
 app.get("/api/avatar", async (c) => {
   const profile = await getProfile(c.env.DB);
-  if (!profile.avatarKey) return c.notFound();
+  if (!profile.avatarKey) {
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
   const obj = await c.env.UPLOADS.get(profile.avatarKey);
-  if (!obj) return c.notFound();
+  if (!obj) {
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
+  const etag = `"${profile.avatarKey}-${profile.updatedAt}"`;
+  if (c.req.header("If-None-Match") === etag) {
+    return new Response(null, { status: 304 });
+  }
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
-  headers.set("Cache-Control", "public, max-age=3600");
+  headers.set("ETag", etag);
+  const hasVersion = c.req.query("v");
+  if (hasVersion) {
+    headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600");
+  } else {
+    headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  }
   return new Response(obj.body, { headers });
 });
 
 app.get("/api/banner", async (c) => {
   const profile = await getProfile(c.env.DB);
-  if (!profile.bannerKey) return c.notFound();
+  if (!profile.bannerKey) {
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
   const obj = await c.env.UPLOADS.get(profile.bannerKey);
-  if (!obj) return c.notFound();
+  if (!obj) {
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
+  const etag = `"${profile.bannerKey}-${profile.updatedAt}"`;
+  if (c.req.header("If-None-Match") === etag) {
+    return new Response(null, { status: 304 });
+  }
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
-  headers.set("Cache-Control", "public, max-age=3600");
+  headers.set("ETag", etag);
+  const hasVersion = c.req.query("v");
+  if (hasVersion) {
+    headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600");
+  } else {
+    headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  }
   return new Response(obj.body, { headers });
 });
 
@@ -152,12 +192,32 @@ app.get("/api/thumb/:id", async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id)) return c.notFound();
   const link = await getLink(c.env.DB, id);
-  if (!link?.thumbnailKey) return c.notFound();
+  if (!link?.thumbnailKey) {
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
   const obj = await c.env.UPLOADS.get(link.thumbnailKey);
-  if (!obj) return c.notFound();
+  if (!obj) {
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
+  const etag = `"${link.thumbnailKey}-${link.createdAt}"`;
+  if (c.req.header("If-None-Match") === etag) {
+    return new Response(null, { status: 304 });
+  }
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
-  headers.set("Cache-Control", "public, max-age=3600");
+  headers.set("ETag", etag);
+  const hasVersion = c.req.query("v");
+  if (hasVersion) {
+    headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600");
+  } else {
+    headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  }
   return new Response(obj.body, { headers });
 });
 

@@ -92,6 +92,9 @@ export default function BrandingTab() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [draftTheme, setDraftTheme] = useState<Theme>(DEFAULT_THEME);
 
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
+
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: { orgName: "", tagline: "" },
@@ -100,15 +103,21 @@ export default function BrandingTab() {
 
   const hydrated = useRef(false);
   useEffect(() => {
-    if (data && !hydrated.current) {
-      hydrated.current = true;
-      form.reset({ orgName: data.profile.orgName, tagline: data.profile.tagline });
-      setSocials(data.profile.socials);
-      setDraftTheme(data.profile.theme ?? DEFAULT_THEME);
-      setAvatarPreview(data.profile.avatarKey ? `/api/avatar?v=${data.profile.updatedAt}` : null);
-      setBannerPreview(data.profile.bannerKey ? `/api/banner?v=${data.profile.updatedAt}` : null);
+    if (data) {
+      if (!hydrated.current) {
+        hydrated.current = true;
+        form.reset({ orgName: data.profile.orgName, tagline: data.profile.tagline });
+        setSocials(data.profile.socials);
+        setDraftTheme(data.profile.theme ?? DEFAULT_THEME);
+      }
+      if (!avatarFile) {
+        setAvatarPreview(data.profile.avatarKey ? `/api/avatar?v=${data.profile.updatedAt}` : null);
+      }
+      if (!bannerFile) {
+        setBannerPreview(data.profile.bannerKey ? `/api/banner?v=${data.profile.updatedAt}` : null);
+      }
     }
-  }, [data, form]);
+  }, [data, form, avatarFile, bannerFile]);
 
   const saveMutation = useMutation({
     mutationFn: (values: { orgName: string; tagline: string; socials: SocialRow[]; theme: Theme }) =>
@@ -141,7 +150,7 @@ export default function BrandingTab() {
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
       toast.success("Avatar uploaded");
       setAvatarFile(null);
-      setAvatarPreview(null);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Upload failed"),
   });
@@ -153,6 +162,7 @@ export default function BrandingTab() {
       toast.success("Avatar removed");
       setAvatarFile(null);
       setAvatarPreview(null);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Remove failed"),
   });
@@ -163,7 +173,7 @@ export default function BrandingTab() {
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
       toast.success("Cover banner uploaded");
       setBannerFile(null);
-      setBannerPreview(null);
+      if (bannerInputRef.current) bannerInputRef.current.value = "";
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Banner upload failed"),
   });
@@ -175,6 +185,7 @@ export default function BrandingTab() {
       toast.success("Cover banner removed");
       setBannerFile(null);
       setBannerPreview(null);
+      if (bannerInputRef.current) bannerInputRef.current.value = "";
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Banner removal failed"),
   });
@@ -198,7 +209,19 @@ export default function BrandingTab() {
 
   const updatePalette = (key: keyof Theme["palette"], value: string) => {
     paletteDirty.current = true;
-    setDraftTheme((t) => ({ ...t, palette: { ...t.palette, [key]: value } }));
+    setDraftTheme((prev) => ({
+      ...prev,
+      palette: {
+        ...prev.palette,
+        [key]: value,
+      },
+    }));
+  };
+
+  const selectPreset = (presetKey: string) => {
+    const preset = THEME_PRESETS.find((p) => p.id === presetKey);
+    if (!preset) return;
+    setDraftTheme(themeFromPreset(presetKey, draftTheme.mode));
   };
 
   const SavedBadge = () => {
@@ -213,10 +236,10 @@ export default function BrandingTab() {
   const previewData = {
     profile: {
       id: 1,
-      orgName: form.watch("orgName") || "Your organization",
-      tagline: form.watch("tagline") || "Tagline goes here",
-      avatarKey: avatarPreview ? "preview" : (data?.profile.avatarKey ?? null),
-      bannerKey: bannerPreview ? "preview" : (data?.profile.bannerKey ?? null),
+      orgName: form.watch("orgName") || "Club Name",
+      tagline: form.watch("tagline") || "",
+      avatarKey: avatarFile ? "preview" : avatarPreview ? data?.profile.avatarKey ?? "avatar" : null,
+      bannerKey: bannerFile ? "preview" : bannerPreview ? data?.profile.bannerKey ?? "banner" : null,
       accentColor: draftTheme.palette.accent,
       socials,
       theme: draftTheme,
@@ -511,6 +534,7 @@ export default function BrandingTab() {
               </div>
               <label className="flex-1">
                 <Input
+                  ref={avatarInputRef}
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/avif"
                   onChange={(e) => {
@@ -566,6 +590,7 @@ export default function BrandingTab() {
             <div className="flex items-center gap-3">
               <label className="flex-1">
                 <Input
+                  ref={bannerInputRef}
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/avif"
                   onChange={(e) => {

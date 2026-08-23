@@ -145,14 +145,26 @@ function getEventDateDetails(startsAt: number | null, endsAt: number | null): Ev
   };
 }
 
-function Avatar({ name, accent, hasAvatar, size = "default" }: { name: string; accent: string; hasAvatar: boolean; size?: "default" | "large" }) {
+function Avatar({
+  name,
+  accent,
+  hasAvatar,
+  size = "default",
+  version,
+}: {
+  name: string;
+  accent: string;
+  hasAvatar: boolean;
+  size?: "default" | "large";
+  version?: number;
+}) {
   const dim = size === "large" ? "h-24 w-24 sm:h-28 sm:w-28" : "h-20 w-20 sm:h-24 sm:w-24";
   return (
     <div className="relative flex items-center justify-center">
       {hasAvatar ? (
         <div className="relative">
           <img
-            src="/api/avatar"
+            src={`/api/avatar?v=${version || 1}`}
             alt={name}
             className={`relative ${dim} object-cover`}
             style={{
@@ -799,11 +811,11 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
               borderColor: "color-mix(in srgb, var(--text) 14%, transparent)",
             }}
           >
-            <img src="/api/banner" alt="" className="h-full w-full object-cover" />
+            <img src={`/api/banner?v=${profile.updatedAt || 1}`} alt="" className="h-full w-full object-cover" />
           </div>
         )}
 
-        <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} />
+        <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} version={profile.updatedAt} />
 
         {profile.orgName && (
           <h1
@@ -847,7 +859,7 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
           className="relative h-44 sm:h-56 md:h-64 w-full overflow-hidden border-b"
           style={{ borderColor: "color-mix(in srgb, var(--text) 12%, transparent)" }}
         >
-          <img src="/api/banner" alt="" className="h-full w-full object-cover" />
+          <img src={`/api/banner?v=${profile.updatedAt || 1}`} alt="" className="h-full w-full object-cover" />
         </div>
       )}
 
@@ -866,7 +878,7 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
                 boxShadow: "var(--card-shadow)",
               }}
             >
-              <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} size="large" />
+              <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} version={profile.updatedAt} size="large" />
 
               {profile.orgName && (
                 <h1
