@@ -193,41 +193,132 @@ function Avatar({ name, accent, hasAvatar, size = "default" }: { name: string; a
 }
 
 function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: string }) {
-  if (socials.length === 0) return null;
+  if (!socials || socials.length === 0) return null;
+
+  const [activePlatform, setActivePlatform] = useState<PlatformId | null>(null);
+
+  // Group socials by platform
+  const grouped = useMemo(() => {
+    const map = new Map<PlatformId, typeof socials>();
+    for (const s of socials) {
+      const list = map.get(s.platform) ?? [];
+      list.push(s);
+      map.set(s.platform, list);
+    }
+    return Array.from(map.entries()).map(([platform, items]) => ({ platform, items }));
+  }, [socials]);
+
   return (
-    <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-      {socials.map((s) => {
-        const label = PLATFORM_LABELS[s.platform] ?? s.platform;
+    <div className="relative mt-5 flex flex-wrap items-center justify-center gap-2">
+      {grouped.map(({ platform, items }) => {
+        const platformName = PLATFORM_LABELS[platform] ?? platform;
+        const isMulti = items.length > 1;
+
+        if (!isMulti) {
+          const single = items[0]!;
+          const tooltip = single.label ? `${platformName} (${single.label})` : platformName;
+          return (
+            <a
+              key={`${platform}-0`}
+              href={single.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={tooltip}
+              title={tooltip}
+              className="group flex h-10 w-10 items-center justify-center transition-all duration-150 hover:-translate-y-0.5"
+              style={{
+                borderRadius: "var(--radius)",
+                borderWidth: "var(--border-width)",
+                borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+                background: "var(--surface)",
+                color: "var(--text)",
+                boxShadow: "var(--card-shadow)",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = accent;
+                (e.currentTarget as HTMLElement).style.color = accent;
+                (e.currentTarget as HTMLElement).style.background = `color-mix(in srgb, ${accent} 10%, var(--surface))`;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = "color-mix(in srgb, var(--text) 16%, transparent)";
+                (e.currentTarget as HTMLElement).style.color = "var(--text)";
+                (e.currentTarget as HTMLElement).style.background = "var(--surface)";
+              }}
+            >
+              <PlatformIcon platform={platform} size={18} />
+            </a>
+          );
+        }
+
+        const isOpen = activePlatform === platform;
+
         return (
-          <a
-            key={s.platform}
-            href={s.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={label}
-            title={label}
-            className="group flex h-10 w-10 items-center justify-center transition-all duration-150 hover:-translate-y-0.5"
-            style={{
-              borderRadius: "var(--radius)",
-              borderWidth: "var(--border-width)",
-              borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
-              background: "var(--surface)",
-              color: "var(--text)",
-              boxShadow: "var(--card-shadow)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = accent;
-              (e.currentTarget as HTMLElement).style.color = accent;
-              (e.currentTarget as HTMLElement).style.background = `color-mix(in srgb, ${accent} 10%, var(--surface))`;
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = "color-mix(in srgb, var(--text) 16%, transparent)";
-              (e.currentTarget as HTMLElement).style.color = "var(--text)";
-              (e.currentTarget as HTMLElement).style.background = "var(--surface)";
-            }}
-          >
-            <PlatformIcon platform={s.platform} size={18} />
-          </a>
+          <div key={platform} className="relative">
+            <button
+              type="button"
+              onClick={() => setActivePlatform(isOpen ? null : platform)}
+              aria-label={`${platformName} (${items.length} channels)`}
+              title={`${platformName} (${items.length} channels)`}
+              className="group relative flex h-10 w-10 items-center justify-center transition-all duration-150 hover:-translate-y-0.5"
+              style={{
+                borderRadius: "var(--radius)",
+                borderWidth: "var(--border-width)",
+                borderColor: isOpen ? accent : "color-mix(in srgb, var(--text) 16%, transparent)",
+                background: isOpen ? `color-mix(in srgb, ${accent} 10%, var(--surface))` : "var(--surface)",
+                color: isOpen ? accent : "var(--text)",
+                boxShadow: "var(--card-shadow)",
+              }}
+            >
+              <PlatformIcon platform={platform} size={18} />
+              <span
+                className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white shadow-xs"
+                style={{ background: accent }}
+              >
+                {items.length}
+              </span>
+            </button>
+
+            {isOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setActivePlatform(null)}
+                  aria-hidden
+                />
+                <div
+                  className="absolute left-1/2 bottom-full mb-2 z-50 -translate-x-1/2 flex min-w-44 flex-col gap-1 p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150"
+                  style={{
+                    background: "var(--surface)",
+                    borderRadius: "var(--card-radius)",
+                    borderWidth: "var(--border-width)",
+                    borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
+                    boxShadow: "var(--card-shadow)",
+                  }}
+                >
+                  <div className="px-2 py-1 font-mono text-[9px] font-bold tracking-wider uppercase opacity-60" style={{ color: "var(--muted)" }}>
+                    {platformName} Channels
+                  </div>
+                  {items.map((item, idx) => (
+                    <a
+                      key={idx}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setActivePlatform(null)}
+                      className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      style={{
+                        borderRadius: "var(--radius)",
+                        color: "var(--text)",
+                      }}
+                    >
+                      <span className="truncate">{item.label || `${platformName} ${idx + 1}`}</span>
+                      <ArrowUpRight className="h-3 w-3 shrink-0 opacity-50" />
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         );
       })}
     </div>

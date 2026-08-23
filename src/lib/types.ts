@@ -15,6 +15,7 @@ export type PlatformId =
 export interface Social {
   platform: PlatformId;
   url: string;
+  label?: string;
 }
 
 export type RadiusPreset = "none" | "sm" | "md" | "lg" | "full";

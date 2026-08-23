@@ -50,6 +50,7 @@ type ProfileForm = z.infer<typeof profileSchema>;
 interface SocialRow {
   platform: PlatformId;
   url: string;
+  label?: string;
 }
 
 const MODE_LABELS: Record<ThemeMode, string> = { light: "Light", dark: "Dark", system: "System" };
@@ -82,6 +83,7 @@ export default function BrandingTab() {
 
   const [socials, setSocials] = useState<SocialRow[]>([]);
   const [newPlatform, setNewPlatform] = useState<PlatformId>("instagram");
+  const [newLabel, setNewLabel] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -183,8 +185,10 @@ export default function BrandingTab() {
       toast.error("Enter a valid http(s) URL");
       return;
     }
-    setSocials((prev) => [...prev, { platform: newPlatform, url }]);
+    const label = newLabel.trim() || undefined;
+    setSocials((prev) => [...prev, { platform: newPlatform, url, label }]);
     setNewUrl("");
+    setNewLabel("");
   };
 
   const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
@@ -577,24 +581,40 @@ export default function BrandingTab() {
           </CardContent>
         </Card>
 
-        {/* Socials */}
+        {/* Socials & Sub-Accounts */}
         <Card>
           <CardHeader>
-            <CardTitle>Social links</CardTitle>
+            <div className="flex flex-col gap-1">
+              <CardTitle>Social Links & Sub-Accounts</CardTitle>
+              <p className="text-xs text-muted-foreground">Add official club handles and sub-accounts (e.g. Magazine, Events, Hackfest).</p>
+            </div>
             <CardAction>
               <SavedBadge />
             </CardAction>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {socials.length === 0 && <p className="text-sm text-muted-foreground">No social links yet.</p>}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               {socials.map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="w-24 text-xs text-muted-foreground">{PLATFORM_LABELS[s.platform]}</span>
+                <div key={i} className="flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-xl border p-2 bg-card">
+                  <span className="w-24 shrink-0 text-xs font-semibold text-foreground truncate">{PLATFORM_LABELS[s.platform]}</span>
+                  <Input
+                    className="w-full sm:w-36 text-xs"
+                    placeholder="Label (e.g. Main, Fest)"
+                    value={s.label ?? ""}
+                    onChange={(e) =>
+                      setSocials((prev) =>
+                        prev.map((x, j) => (j === i ? { ...x, label: e.target.value || undefined } : x)),
+                      )
+                    }
+                  />
                   <Input
                     className="flex-1 font-mono text-xs"
+                    placeholder="https://..."
                     value={s.url}
-                    onChange={(e) => setSocials((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
+                    onChange={(e) =>
+                      setSocials((prev) => prev.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))
+                    }
                   />
                   <Button
                     variant="ghost"
@@ -608,9 +628,9 @@ export default function BrandingTab() {
               ))}
             </div>
             <Separator />
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
               <Select value={newPlatform} onValueChange={(v) => setNewPlatform(v as PlatformId)}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-36">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -621,6 +641,13 @@ export default function BrandingTab() {
                   ))}
                 </SelectContent>
               </Select>
+              <Input
+                className="w-full sm:w-36 text-xs"
+                placeholder="Label (optional)"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addSocial()}
+              />
               <Input
                 className="flex-1 font-mono text-xs"
                 placeholder="https://instagram.com/yourhandle"
