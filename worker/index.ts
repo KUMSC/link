@@ -103,6 +103,20 @@ app.get("/", async (c) => {
 // ---- Public API ----------------------------------------------------------
 
 app.get("/api/public", async (c) => {
+  // Record a page view (fire-and-forget) using a privacy-friendly hash.
+  c.executionCtx.waitUntil(
+    (async () => {
+      const hash = await visitorHash(c.req.raw);
+      const ua = nullable(c.req.header("User-Agent"));
+      await recordView(c.env.DB, {
+        visitorHash: hash,
+        referer: nullable(c.req.header("Referer")),
+        country: (c.req.raw as Request & { cf?: { country?: string | null } }).cf?.country ?? null,
+        device: detectDevice(ua),
+      });
+    })(),
+  );
+
   // Serve from KV cache when fresh, else compute + cache.
   const cached = await getCachedPublic<{ profile: unknown; links: unknown }>(c.env);
   if (cached) return c.json(cached);
