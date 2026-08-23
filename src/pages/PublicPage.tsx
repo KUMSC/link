@@ -878,7 +878,7 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
               )}
 
               {profile.tagline && (
-                <p className="mt-2 text-sm sm:text-[15px] leading-relaxed font-normal" style={{ color: "var(--muted)" }}>
+                <p className="mt-2 text-sm sm:text-[15px] leading-relaxed font-normal line-clamp-4 max-w-md" style={{ color: "var(--muted)" }}>
                   {profile.tagline}
                 </p>
               )}

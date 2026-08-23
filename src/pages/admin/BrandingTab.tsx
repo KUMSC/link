@@ -41,8 +41,8 @@ import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { cn } from "../../lib/utils";
 
 const profileSchema = z.object({
-  orgName: z.string().min(1, "Organization name is required"),
-  tagline: z.string().max(120, "Keep it under 120 characters"),
+  orgName: z.string().min(1, "Organization name is required").max(60, "Keep name under 60 characters"),
+  tagline: z.string().max(140, "Tagline must be 140 characters or fewer"),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -245,8 +245,27 @@ export default function BrandingTab() {
               )}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="tagline">Tagline / bio</Label>
-              <Textarea id="tagline" placeholder="Latest events, forms & socials" {...form.register("tagline")} />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="tagline">Tagline / Bio</Label>
+                <span
+                  className={cn(
+                    "font-mono text-[10px]",
+                    (form.watch("tagline") || "").length >= 140 ? "text-destructive font-bold" : "text-muted-foreground",
+                  )}
+                >
+                  {(form.watch("tagline") || "").length} / 140
+                </span>
+              </div>
+              <Textarea
+                id="tagline"
+                maxLength={140}
+                rows={3}
+                placeholder="Latest events, forms & socials"
+                {...form.register("tagline")}
+              />
+              {form.formState.errors.tagline && (
+                <p className="text-xs text-destructive">{form.formState.errors.tagline.message}</p>
+              )}
             </div>
           </CardContent>
         </Card>

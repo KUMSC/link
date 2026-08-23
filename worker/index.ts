@@ -210,8 +210,8 @@ app.put("/api/admin/profile", async (c) => {
     theme?: Theme;
   }>();
   const profile = await updateProfile(c.env.DB, {
-    orgName: body.orgName,
-    tagline: body.tagline,
+    orgName: body.orgName ? body.orgName.trim().slice(0, 60) : undefined,
+    tagline: body.tagline !== undefined ? body.tagline.trim().slice(0, 140) : undefined,
     accentColor: body.accentColor,
     socials: body.socials,
     theme: body.theme ? parseTheme(JSON.stringify(body.theme)) : undefined,
