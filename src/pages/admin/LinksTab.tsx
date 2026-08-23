@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowUp,
+  Ban,
   CalendarClock,
   ImagePlus,
   Link as LinkIcon,
@@ -24,7 +25,9 @@ import {
   updateLink,
   uploadThumbnail,
 } from "../../lib/api";
-import { validateUrl } from "../../lib/platforms";
+import { LINK_ICON_CHOICES, SOCIAL_ICON_CHOICES, validateUrl } from "../../lib/platforms";
+import { LinkIconBadge } from "../../lib/link-icon";
+import { cn } from "../../lib/utils";
 import type { LinkItem, LinkKind } from "../../lib/types";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -62,6 +65,7 @@ const linkSchema = z
     url: z.string().min(1, "URL is required").refine(validateUrl, "Enter a valid http(s) URL"),
     highlight: z.boolean(),
     kind: z.enum(["link", "event"]),
+    icon: z.string().nullable(),
     startsAt: z.string().optional(),
     endsAt: z.string().optional(),
     location: z.string().optional(),
@@ -102,7 +106,7 @@ function LinkEditor({
   const kind = editing?.kind ?? "link";
   const form = useForm<LinkForm>({
     resolver: zodResolver(linkSchema),
-    defaultValues: { label: "", url: "", highlight: false, kind: "link" },
+    defaultValues: { label: "", url: "", highlight: false, kind: "link", icon: null },
   });
   const [thumbFile, setThumbFile] = useState<File | null>(null);
   const [thumbPreview, setThumbPreview] = useState<string | null>(null);
@@ -115,6 +119,7 @@ function LinkEditor({
         url: editing?.url ?? "",
         highlight: editing?.highlight === 1,
         kind: editing?.kind ?? "link",
+        icon: editing?.icon ?? null,
         startsAt: toLocal(editing?.startsAt),
         endsAt: toLocal(editing?.endsAt),
         location: editing?.location ?? "",
@@ -152,6 +157,7 @@ function LinkEditor({
         url: values.url,
         highlight: values.highlight,
         kind: values.kind,
+        icon: values.icon,
         startsAt: toUnix(values.startsAt),
         endsAt: toUnix(values.endsAt),
         location: values.location?.trim() || null,
@@ -263,6 +269,54 @@ function LinkEditor({
               )}
             </div>
           )}
+
+          {/* Icon */}
+          <div className="grid gap-2">
+            <Label>Icon</Label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => form.setValue("icon", null)}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-lg border text-xs transition-colors",
+                  !form.watch("icon") ? "border-ring ring-1 ring-ring" : "text-muted-foreground hover:border-ring",
+                )}
+                aria-label="No icon"
+              >
+                <Ban className="h-4 w-4" />
+              </button>
+              {LINK_ICON_CHOICES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  title={c.label}
+                  aria-label={c.label}
+                  onClick={() => form.setValue("icon", c.id)}
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-lg border transition-colors hover:border-ring",
+                    form.watch("icon") === c.id ? "border-ring ring-1 ring-ring" : "text-muted-foreground",
+                  )}
+                >
+                  <LinkIconBadge icon={c.id} size={16} />
+                </button>
+              ))}
+              {SOCIAL_ICON_CHOICES.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  title={p}
+                  aria-label={p}
+                  onClick={() => form.setValue("icon", p)}
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-lg border transition-colors hover:border-ring",
+                    form.watch("icon") === p ? "border-ring ring-1 ring-ring" : "text-muted-foreground",
+                  )}
+                >
+                  <LinkIconBadge icon={p} size={16} />
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
@@ -382,7 +436,12 @@ export default function LinksTab() {
                     </button>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium">{link.label}</TableCell>
+                <TableCell className="font-medium">
+                  <span className="flex items-center gap-2">
+                    {link.icon && <LinkIconBadge icon={link.icon} size={15} />}
+                    {link.label}
+                  </span>
+                </TableCell>
                 <TableCell>
                   {link.kind === "event" ? (
                     <Badge variant="secondary" className="gap-1">

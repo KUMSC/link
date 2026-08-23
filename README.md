@@ -2,11 +2,23 @@
 
 A self-hostable link-in-bio platform for clubs and organizations, built 100% on Cloudflare's free tier. Deploy your own copy, set your branding, and share event forms, socials, and links from one page you own.
 
+## Features
+
+- **Public page** — avatar, tagline, social icon row, link cards, event countdown cards
+- **Themes** — 6 presets (light + dark palettes), Google Font picker, 4-color palette editor, live preview in the admin
+- **Events** — links with start/end time + location; render as countdown cards
+- **Thumbnails** — per-link/event images stored in R2, shown on cards
+- **Icons** — pick a brand or generic icon per link card
+- **Analytics** — page views, unique visitors (privacy-friendly hashed daily uniques), clicks, CTR, top referrers, countries, devices; 7/30/90/all-time ranges; CSV export
+- **Sharing** — copy-link, QR code (with SVG download for posters), X and WhatsApp share
+- **Admin auth** — Cloudflare Access (free up to 50 users) with Worker-side JWT verification
+
 ## Stack
 
 - **Frontend**: Vite 8 + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui
 - **Backend**: Hono (Cloudflare Worker) via `@cloudflare/vite-plugin`
-- **Data**: D1 (SQLite) · **Files**: R2 (avatar uploads)
+- **Data**: D1 (SQLite) · **Files**: R2 (avatar + thumbnail uploads)
+- **Cache**: optional Workers KV for the public payload (auto-invalidated on edits)
 - **Admin auth**: Cloudflare Access (free for up to 50 users)
 - **Social preview**: build-time OG image (satori + resvg), no runtime image processing
 
@@ -62,6 +74,15 @@ creates the resources automatically and injects the real id on deploy.
    npx wrangler secret put ACCESS_TEAM_DOMAIN   # e.g. https://yourteam.cloudflareaccess.com
    npx wrangler secret put ACCESS_AUD           # your Access application AUD tag
    ```
+7. **Optional — KV caching** (KV namespaces are *not* auto-provisioned):
+   ```bash
+   npx wrangler kv namespace create CACHE       # → copy the id
+   ```
+   then add to `wrangler.jsonc`:
+   ```jsonc
+   "kv_namespaces": [{ "binding": "CACHE", "id": "<the id>" }]
+   ```
+   Without it the app works identically; it just skips caching.
 
 ### Option B — manual CLI
 

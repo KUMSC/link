@@ -38,3 +38,29 @@ export function validateUrl(value: string): boolean {
     return false;
   }
 }
+
+/** Generic icon ids usable on any link card (lucide names). */
+export type LinkIconId = "link" | "mail" | "calendar" | "file" | "book" | "users" | "map" | "star";
+
+export const LINK_ICON_CHOICES: { id: LinkIconId; label: string }[] = [
+  { id: "link", label: "Link" },
+  { id: "mail", label: "Contact" },
+  { id: "calendar", label: "Schedule" },
+  { id: "file", label: "Document" },
+  { id: "book", label: "Notes" },
+  { id: "users", label: "Team" },
+  { id: "map", label: "Location" },
+  { id: "star", label: "Featured" },
+];
+
+/** Social platform ids offered in the link icon picker. */
+export const SOCIAL_ICON_CHOICES: PlatformId[] = [
+  "instagram",
+  "twitter",
+  "linkedin",
+  "github",
+  "youtube",
+  "discord",
+  "telegram",
+  "whatsapp",
+];

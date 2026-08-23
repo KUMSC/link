@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowUpRight, CalendarClock, Clock, MapPin, Sparkles } from "lucide-react";
+import { renderSVG } from "uqr";
 import { getPublic } from "../lib/api";
 import type { LinkItem, Profile } from "../lib/types";
 import { PlatformIcon } from "../lib/icons";
+import { LinkIconBadge } from "../lib/link-icon";
 import { ThemeProvider, useTheme } from "../lib/ThemeContext";
 
 export interface PageData {
@@ -148,6 +150,11 @@ function LinkCard({ link, accent, featured }: { link: LinkItem; accent: string; 
       {link.thumbnailKey && (
         <img src={`/api/thumb/${link.id}`} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
       )}
+      {!link.thumbnailKey && link.icon && (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: `${accent}1f`, color: accent }}>
+          <LinkIconBadge icon={link.icon} size={17} />
+        </span>
+      )}
       <span className="min-w-0 truncate">{link.label}</span>
       <ArrowUpRight className="absolute right-5 h-4.5 w-4.5 opacity-30 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100" />
     </a>
@@ -224,8 +231,49 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
   );
 }
 
+function QrPopover({ url, accent }: { url: string; accent: string }) {
+  const [open, setOpen] = useState(false);
+  const svg = useMemo(() => renderSVG(url, { ecc: "M", border: 1 }), [url]);
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="rounded-full border px-3 py-1.5 transition-colors hover:opacity-80"
+        style={{ borderColor: "color-mix(in srgb, var(--text) 18%, transparent)" }}
+      >
+        QR
+      </button>
+    );
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6" onClick={() => setOpen(false)}>
+      <div
+        className="flex w-full max-w-xs flex-col items-center gap-4 rounded-2xl p-6 shadow-2xl"
+        style={{ background: "var(--surface)", color: "var(--text)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-sm font-semibold">Scan to visit</p>
+        <div className="rounded-xl bg-white p-3" dangerouslySetInnerHTML={{ __html: svg }} />
+        <p className="max-w-full truncate text-xs" style={{ color: "var(--muted)" }}>{url}</p>
+        <a
+          href={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
+          download="qr.svg"
+          className="w-full rounded-full px-4 py-2 text-center text-sm font-medium text-white"
+          style={{ background: accent }}
+        >
+          Download SVG
+        </a>
+        <button onClick={() => setOpen(false)} className="text-xs" style={{ color: "var(--muted)" }}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ShareRow() {
   const [copied, setCopied] = useState(false);
+  const { theme } = useTheme();
   const url = typeof window !== "undefined" ? window.location.origin : "";
   const copy = async () => {
     try {
@@ -246,6 +294,7 @@ function ShareRow() {
       >
         {copied ? "Copied!" : "Copy link"}
       </button>
+      <QrPopover url={url} accent={theme.palette.accent} />
       <a
         href={`https://x.com/intent/post?url=${shareUrl}`}
         target="_blank"
