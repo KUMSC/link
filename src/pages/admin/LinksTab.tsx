@@ -5,10 +5,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
+  Archive,
   ArrowDown,
   ArrowUp,
   Ban,
   CalendarClock,
+  Clock,
+  Copy,
   ImagePlus,
   Link as LinkIcon,
   Pencil,
@@ -19,6 +22,7 @@ import {
 import {
   createLink,
   deleteLink,
+  duplicateLink,
   getAdminData,
   removeThumbnail,
   reorderLinks,
@@ -73,6 +77,9 @@ const linkSchema = z
     status: z.enum(["auto", "open", "closed", "sold_out", "free_entry", "invite_only", "waitlist"]).optional(),
     categoryTag: z.string().optional(),
     ctaText: z.string().optional(),
+    publishAt: z.string().optional(),
+    expiresAt: z.string().optional(),
+    archived: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.kind === "event" && !v.startsAt && !v.endsAt) {
@@ -119,6 +126,9 @@ function LinkEditor({
       status: "auto",
       categoryTag: "",
       ctaText: "",
+      publishAt: "",
+      expiresAt: "",
+      archived: false,
     },
   });
   const [thumbFile, setThumbFile] = useState<File | null>(null);
@@ -139,6 +149,9 @@ function LinkEditor({
         status: editing?.status ?? "auto",
         categoryTag: editing?.categoryTag ?? "",
         ctaText: editing?.ctaText ?? "",
+        publishAt: toLocal(editing?.publishAt),
+        expiresAt: toLocal(editing?.expiresAt),
+        archived: editing?.archived === 1,
       });
       setThumbFile(null);
       setThumbPreview(editing?.thumbnailKey ? `/api/thumb/${editing.id}` : null);
@@ -180,6 +193,9 @@ function LinkEditor({
         status: values.status ?? "auto",
         categoryTag: values.categoryTag?.trim() || null,
         ctaText: values.ctaText?.trim() || null,
+        publishAt: toUnix(values.publishAt),
+        expiresAt: toUnix(values.expiresAt),
+        archived: values.archived ? 1 : 0,
       };
       const result = editing ? await updateLink(editing.id, payload) : await createLink(payload);
       // Thumbnail follows the link row: upload a newly picked file, or remove
@@ -401,6 +417,43 @@ function LinkEditor({
             </div>
           </div>
 
+          {/* Scheduling & Auto-Expiry */}
+          <div className="grid gap-3 rounded-lg border p-3.5 bg-muted/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold">Publish & Expiry Schedule</p>
+                <p className="text-[11px] text-muted-foreground">Optional: Control when this link appears and disappears automatically.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="archived" className="text-xs">Archived</Label>
+                <Switch
+                  id="archived"
+                  checked={form.watch("archived")}
+                  onCheckedChange={(v) => form.setValue("archived", v)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="grid gap-1.5">
+                <Label htmlFor="publishAt" className="text-xs">Publish At (Start)</Label>
+                <Input
+                  id="publishAt"
+                  type="datetime-local"
+                  {...form.register("publishAt")}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="expiresAt" className="text-xs">Expire At (End)</Label>
+                <Input
+                  id="expiresAt"
+                  type="datetime-local"
+                  {...form.register("expiresAt")}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <p className="text-sm font-medium">Featured</p>
@@ -426,6 +479,20 @@ function LinkEditor({
   );
 }
 
+function getScheduleStatus(link: LinkItem) {
+  const now = Math.floor(Date.now() / 1000);
+  if (link.archived === 1) {
+    return { label: "Archived", variant: "secondary" as const, icon: Archive };
+  }
+  if (link.publishAt && link.publishAt > now) {
+    return { label: "Scheduled", variant: "outline" as const, icon: Clock };
+  }
+  if (link.expiresAt && link.expiresAt <= now) {
+    return { label: "Expired", variant: "destructive" as const, icon: Ban };
+  }
+  return { label: "Active", variant: "default" as const, icon: null };
+}
+
 export default function LinksTab() {
   const { data } = useQuery({ queryKey: ["admin-data"], queryFn: getAdminData });
   const queryClient = useQueryClient();
@@ -439,6 +506,15 @@ export default function LinksTab() {
     mutationFn: reorderLinks,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
     onError: (e) => toast.error(e instanceof Error ? e.message : "Reorder failed"),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: duplicateLink,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      toast.success("Link duplicated");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Duplicate failed"),
   });
 
   const deleteMutation = useMutation({
@@ -485,86 +561,109 @@ export default function LinksTab() {
               <TableHead className="w-10" />
               <TableHead>Label</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Schedule / Status</TableHead>
               <TableHead className="w-10">Featured</TableHead>
-              <TableHead className="w-28 text-right">Actions</TableHead>
+              <TableHead className="w-32 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {links.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
                   No links yet — add your first one.
                 </TableCell>
               </TableRow>
             )}
-            {links.map((link, index) => (
-              <TableRow key={link.id}>
-                <TableCell>
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      onClick={() => move(index, -1)}
-                      disabled={index === 0 || moveMutation.isPending}
-                      className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
-                      aria-label="Move up"
-                    >
-                      <ArrowUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => move(index, 1)}
-                      disabled={index === links.length - 1 || moveMutation.isPending}
-                      className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
-                      aria-label="Move down"
-                    >
-                      <ArrowDown className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </TableCell>
-                <TableCell className="font-medium">
-                  <span className="flex items-center gap-2">
-                    {link.icon && <LinkIconBadge icon={link.icon} size={15} />}
-                    {link.label}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  {link.kind === "event" ? (
-                    <Badge variant="secondary" className="gap-1">
-                      <CalendarClock className="h-3 w-3" /> Event
+            {links.map((link, index) => {
+              const sched = getScheduleStatus(link);
+              const SchedIcon = sched.icon;
+              return (
+                <TableRow key={link.id} className={cn(link.archived === 1 && "opacity-60")}>
+                  <TableCell>
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={() => move(index, -1)}
+                        disabled={index === 0 || moveMutation.isPending}
+                        className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                        aria-label="Move up"
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => move(index, 1)}
+                        disabled={index === links.length - 1 || moveMutation.isPending}
+                        className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                        aria-label="Move down"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    <span className="flex items-center gap-2">
+                      {link.icon && <LinkIconBadge icon={link.icon} size={15} />}
+                      {link.label}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {link.kind === "event" ? (
+                      <Badge variant="secondary" className="gap-1">
+                        <CalendarClock className="h-3 w-3" /> Event
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1">
+                        <LinkIcon className="h-3 w-3" /> Link
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={sched.variant} className="gap-1 text-[11px]">
+                      {SchedIcon && <SchedIcon className="h-3 w-3" />}
+                      <span>{sched.label}</span>
                     </Badge>
-                  ) : (
-                    <Badge variant="outline" className="gap-1">
-                      <LinkIcon className="h-3 w-3" /> Link
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {link.highlight === 1 && <Star className="h-4 w-4" style={{ color: accent }} fill="currentColor" />}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setEditing(link);
-                        setEditorOpen(true);
-                      }}
-                      aria-label={`Edit ${link.label}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteMutation.mutate(link.id)}
-                      disabled={deleteMutation.isPending}
-                      aria-label={`Delete ${link.label}`}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell>
+                    {link.highlight === 1 && <Star className="h-4 w-4" style={{ color: accent }} fill="currentColor" />}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => duplicateMutation.mutate(link.id)}
+                        disabled={duplicateMutation.isPending}
+                        aria-label={`Duplicate ${link.label}`}
+                        title="Duplicate"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditing(link);
+                          setEditorOpen(true);
+                        }}
+                        aria-label={`Edit ${link.label}`}
+                        title="Edit"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteMutation.mutate(link.id)}
+                        disabled={deleteMutation.isPending}
+                        aria-label={`Delete ${link.label}`}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         </CardContent>

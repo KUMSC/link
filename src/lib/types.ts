@@ -145,6 +145,9 @@ export interface LinkItem {
   status?: EventStatus | null;
   categoryTag?: string | null;
   ctaText?: string | null;
+  publishAt?: number | null;
+  expiresAt?: number | null;
+  archived?: number;
   createdAt: number;
 }
 
@@ -182,6 +185,7 @@ export interface StatsData {
   referrers: BreakdownRow[];
   countries: BreakdownRow[];
   devices: BreakdownRow[];
+  campaigns?: BreakdownRow[];
   rangeDays: number;
 }
 
@@ -193,4 +197,11 @@ export interface AdminData {
   profile: Profile;
   links: LinkItem[];
   auth: AuthInfo;
+}
+
+export interface BackupData {
+  version: number;
+  exportedAt: number;
+  profile: Profile;
+  links: LinkItem[];
 }

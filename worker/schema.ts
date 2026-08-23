@@ -52,8 +52,12 @@ const COLUMN_ADDITIONS: Record<string, string[]> = {
     "status TEXT DEFAULT 'auto'",
     "category_tag TEXT",
     "cta_text TEXT",
+    "publish_at INTEGER",
+    "expires_at INTEGER",
+    "archived INTEGER NOT NULL DEFAULT 0",
   ],
-  clicks: ["country TEXT", "device TEXT", "visitor_hash TEXT"],
+  clicks: ["country TEXT", "device TEXT", "visitor_hash TEXT", "source_tag TEXT"],
+  views: ["source_tag TEXT"],
 };
 
 const EXTRA_CREATES = [

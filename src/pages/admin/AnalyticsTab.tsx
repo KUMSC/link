@@ -322,8 +322,9 @@ export default function AnalyticsTab() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Breakdown title="Top Traffic Sources" rows={data.referrers} accent={accent} />
+            <Breakdown title="Campaign Tags (?src=)" rows={data.campaigns || []} accent={accent} />
             <Breakdown title="Geographic Locations" rows={data.countries} accent={accent} />
             <Breakdown title="User Devices" rows={data.devices} accent={accent} />
           </div>

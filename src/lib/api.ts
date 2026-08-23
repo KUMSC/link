@@ -92,6 +92,12 @@ export async function createLink(fields: {
   startsAt?: number | null;
   endsAt?: number | null;
   location?: string | null;
+  status?: import("./types").EventStatus | null;
+  categoryTag?: string | null;
+  ctaText?: string | null;
+  publishAt?: number | null;
+  expiresAt?: number | null;
+  archived?: number;
 }): Promise<{ link: import("./types").LinkItem }> {
   return parse(
     fetch(`${BASE}/admin/links`, {
@@ -113,6 +119,12 @@ export async function updateLink(
     startsAt?: number | null;
     endsAt?: number | null;
     location?: string | null;
+    status?: import("./types").EventStatus | null;
+    categoryTag?: string | null;
+    ctaText?: string | null;
+    publishAt?: number | null;
+    expiresAt?: number | null;
+    archived?: number;
   },
 ): Promise<{ link: import("./types").LinkItem }> {
   return parse(
@@ -120,6 +132,14 @@ export async function updateLink(
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
+    }),
+  );
+}
+
+export async function duplicateLink(id: number): Promise<{ link: import("./types").LinkItem }> {
+  return parse(
+    fetch(`${BASE}/admin/links/${id}/duplicate`, {
+      method: "POST",
     }),
   );
 }
@@ -152,4 +172,18 @@ export async function reorderLinks(ids: number[]): Promise<void> {
     body: JSON.stringify({ ids }),
   });
   if (!res.ok) throw new Error("Failed to reorder links");
+}
+
+export async function getBackupData(): Promise<import("./types").BackupData> {
+  return parse(fetch(`${BASE}/admin/backup`));
+}
+
+export async function restoreBackupData(payload: Partial<import("./types").BackupData>): Promise<{ ok: boolean }> {
+  return parse(
+    fetch(`${BASE}/admin/restore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
 }

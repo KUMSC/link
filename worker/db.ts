@@ -32,13 +32,16 @@ function mapLink(row: Record<string, unknown>): LinkItem {
     status: (row.status as LinkItem["status"]) ?? "auto",
     categoryTag: (row.category_tag as string | null) ?? null,
     ctaText: (row.cta_text as string | null) ?? null,
+    publishAt: (row.publish_at as number | null) ?? null,
+    expiresAt: (row.expires_at as number | null) ?? null,
+    archived: (row.archived as number) ?? 0,
     createdAt: row.created_at as number,
   };
 }
 
 const PROFILE_COLS = "id, org_name, tagline, avatar_key, banner_key, accent_color, socials, theme, updated_at";
 const LINK_COLS =
-  "id, label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location, thumbnail_key, status, category_tag, cta_text, created_at";
+  "id, label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location, thumbnail_key, status, category_tag, cta_text, publish_at, expires_at, archived, created_at";
 
 export async function getProfile(db: D1Database): Promise<Profile> {
   const res = await db.prepare(`SELECT ${PROFILE_COLS} FROM profile WHERE id = 1`).first();
@@ -96,6 +99,19 @@ export async function getLinks(db: D1Database): Promise<LinkItem[]> {
   return (res.results as Record<string, unknown>[]).map(mapLink);
 }
 
+export async function getActivePublicLinks(db: D1Database): Promise<LinkItem[]> {
+  const res = await db
+    .prepare(
+      `SELECT ${LINK_COLS} FROM links
+       WHERE (archived IS NULL OR archived = 0)
+         AND (publish_at IS NULL OR publish_at <= unixepoch())
+         AND (expires_at IS NULL OR expires_at > unixepoch())
+       ORDER BY sort_order ASC, id ASC`,
+    )
+    .all();
+  return (res.results as Record<string, unknown>[]).map(mapLink);
+}
+
 export async function getLink(db: D1Database, id: number): Promise<LinkItem | null> {
   const res = await db.prepare(`SELECT ${LINK_COLS} FROM links WHERE id = ?`).bind(id).first();
   return res ? mapLink(res as Record<string, unknown>) : null;
@@ -114,6 +130,9 @@ export interface LinkCreate {
   status?: LinkItem["status"];
   categoryTag?: string | null;
   ctaText?: string | null;
+  publishAt?: number | null;
+  expiresAt?: number | null;
+  archived?: number;
 }
 
 export async function createLink(db: D1Database, fields: LinkCreate): Promise<LinkItem> {
@@ -121,8 +140,8 @@ export async function createLink(db: D1Database, fields: LinkCreate): Promise<Li
   const nextSort = ((count?.n as number) ?? 0) + 1;
   const res = await db
     .prepare(
-      `INSERT INTO links (label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location, thumbnail_key, status, category_tag, cta_text)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO links (label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location, thumbnail_key, status, category_tag, cta_text, publish_at, expires_at, archived)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING ${LINK_COLS}`,
     )
     .bind(
@@ -139,6 +158,9 @@ export async function createLink(db: D1Database, fields: LinkCreate): Promise<Li
       fields.status ?? "auto",
       fields.categoryTag ?? null,
       fields.ctaText ?? null,
+      fields.publishAt ?? null,
+      fields.expiresAt ?? null,
+      fields.archived ?? 0,
     )
     .first();
   return mapLink(res as Record<string, unknown>);
@@ -157,6 +179,9 @@ export interface LinkUpdate {
   status?: LinkItem["status"];
   categoryTag?: string | null;
   ctaText?: string | null;
+  publishAt?: number | null;
+  expiresAt?: number | null;
+  archived?: number;
 }
 
 export async function updateLink(db: D1Database, id: number, fields: LinkUpdate): Promise<LinkItem | null> {
@@ -176,7 +201,10 @@ export async function updateLink(db: D1Database, id: number, fields: LinkUpdate)
         thumbnail_key = ?,
         status = ?,
         category_tag = ?,
-        cta_text = ?
+        cta_text = ?,
+        publish_at = ?,
+        expires_at = ?,
+        archived = ?
        WHERE id = ?`,
     )
     .bind(
@@ -192,10 +220,35 @@ export async function updateLink(db: D1Database, id: number, fields: LinkUpdate)
       fields.status === undefined ? current.status ?? "auto" : fields.status,
       fields.categoryTag === undefined ? current.categoryTag : fields.categoryTag,
       fields.ctaText === undefined ? current.ctaText : fields.ctaText,
+      fields.publishAt === undefined ? current.publishAt : fields.publishAt,
+      fields.expiresAt === undefined ? current.expiresAt : fields.expiresAt,
+      fields.archived === undefined ? current.archived ?? 0 : fields.archived,
       id,
     )
     .run();
   return getLink(db, id);
+}
+
+export async function duplicateLink(db: D1Database, id: number): Promise<LinkItem | null> {
+  const item = await getLink(db, id);
+  if (!item) return null;
+  return createLink(db, {
+    label: `${item.label} (Copy)`,
+    url: item.url,
+    icon: item.icon,
+    highlight: !!item.highlight,
+    kind: item.kind,
+    startsAt: item.startsAt,
+    endsAt: item.endsAt,
+    location: item.location,
+    thumbnailKey: item.thumbnailKey,
+    status: item.status,
+    categoryTag: item.categoryTag,
+    ctaText: item.ctaText,
+    publishAt: item.publishAt,
+    expiresAt: item.expiresAt,
+    archived: item.archived,
+  });
 }
 
 export async function deleteLink(db: D1Database, id: number): Promise<void> {
@@ -211,19 +264,20 @@ export interface ClickContext {
   country?: string | null;
   device?: string | null;
   visitorHash?: string | null;
+  sourceTag?: string | null;
 }
 
 export async function recordClick(db: D1Database, linkId: number, ctx: ClickContext = {}): Promise<void> {
   await db
-    .prepare("INSERT INTO clicks (link_id, referer, country, device, visitor_hash) VALUES (?, ?, ?, ?, ?)")
-    .bind(linkId, ctx.referer ?? null, ctx.country ?? null, ctx.device ?? null, ctx.visitorHash ?? null)
+    .prepare("INSERT INTO clicks (link_id, referer, country, device, visitor_hash, source_tag) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(linkId, ctx.referer ?? null, ctx.country ?? null, ctx.device ?? null, ctx.visitorHash ?? null, ctx.sourceTag ?? null)
     .run();
 }
 
 export async function recordView(db: D1Database, ctx: ClickContext): Promise<void> {
   await db
-    .prepare("INSERT INTO views (visitor_hash, referer, country, device) VALUES (?, ?, ?, ?)")
-    .bind(ctx.visitorHash ?? "", ctx.referer ?? null, ctx.country ?? null, ctx.device ?? null)
+    .prepare("INSERT INTO views (visitor_hash, referer, country, device, source_tag) VALUES (?, ?, ?, ?, ?)")
+    .bind(ctx.visitorHash ?? "", ctx.referer ?? null, ctx.country ?? null, ctx.device ?? null, ctx.sourceTag ?? null)
     .run();
 }
 
@@ -382,10 +436,29 @@ export async function getReferrerBreakdown(
     .map(([key, count]) => ({ key, count }));
 }
 
+export async function getCampaignBreakdown(
+  db: D1Database,
+  days: number,
+  limit = 10,
+): Promise<{ key: string; count: number }[]> {
+  const res = await db
+    .prepare(
+      `SELECT source_tag AS key, COUNT(*) AS count
+       FROM views WHERE viewed_at >= unixepoch() - ? AND source_tag IS NOT NULL AND source_tag != ''
+       GROUP BY key ORDER BY count DESC LIMIT ?`,
+    )
+    .bind(days * 86400, limit)
+    .all();
+  return (res.results as Record<string, unknown>[]).map((r) => ({
+    key: r.key as string,
+    count: r.count as number,
+  }));
+}
+
 export async function getAllClicks(db: D1Database, days: number): Promise<Record<string, unknown>[]> {
   const res = await db
     .prepare(
-      `SELECT c.id, l.label AS link, c.clicked_at, c.referer, c.country, c.device
+      `SELECT c.id, l.label AS link, c.clicked_at, c.referer, c.country, c.device, c.source_tag
        FROM clicks c JOIN links l ON l.id = c.link_id
        WHERE c.clicked_at >= unixepoch() - ?
        ORDER BY c.clicked_at DESC`,
@@ -393,4 +466,43 @@ export async function getAllClicks(db: D1Database, days: number): Promise<Record
     .bind(days * 86400)
     .all();
   return res.results as Record<string, unknown>[];
+}
+
+export async function restoreBackup(
+  db: D1Database,
+  backup: { profile: Partial<Profile>; links: Partial<LinkItem>[] },
+): Promise<void> {
+  if (backup.profile) {
+    await updateProfile(db, {
+      orgName: backup.profile.orgName,
+      tagline: backup.profile.tagline,
+      accentColor: backup.profile.accentColor,
+      socials: backup.profile.socials,
+      theme: backup.profile.theme,
+    });
+  }
+  if (Array.isArray(backup.links)) {
+    await db.prepare("DELETE FROM links").run();
+    for (const link of backup.links) {
+      if (link.label && link.url) {
+        await createLink(db, {
+          label: link.label,
+          url: link.url,
+          icon: link.icon,
+          highlight: !!link.highlight,
+          kind: link.kind ?? "link",
+          startsAt: link.startsAt,
+          endsAt: link.endsAt,
+          location: link.location,
+          thumbnailKey: link.thumbnailKey,
+          status: link.status,
+          categoryTag: link.categoryTag,
+          ctaText: link.ctaText,
+          publishAt: link.publishAt,
+          expiresAt: link.expiresAt,
+          archived: link.archived ?? 0,
+        });
+      }
+    }
+  }
 }

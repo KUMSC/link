@@ -4,12 +4,20 @@ import type { CSSProperties } from "react";
 import {
   ArrowUpRight,
   Calendar,
+  CalendarPlus,
+  Check,
   ChevronDown,
+  Clock,
   Copy,
+  Download,
+  ExternalLink,
   MapPin,
   QrCode,
+  Search,
+  Share2,
   Sparkles,
   Ticket,
+  X,
 } from "lucide-react";
 import { renderSVG } from "uqr";
 import { getPublic } from "../lib/api";
@@ -354,6 +362,142 @@ function getEventStatusBadge(
   };
 }
 
+function formatIcsDate(timestamp: number): string {
+  const d = new Date(timestamp * 1000);
+  return d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+}
+
+function generateGoogleCalendarUrl(link: LinkItem): string {
+  const startStr = link.startsAt ? formatIcsDate(link.startsAt) : "";
+  const endStr = link.endsAt ? formatIcsDate(link.endsAt) : link.startsAt ? formatIcsDate(link.startsAt + 7200) : "";
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(link.label)}&dates=${startStr}/${endStr}&details=${encodeURIComponent(link.url)}&location=${encodeURIComponent(link.location || "")}`;
+}
+
+function downloadIcsFile(link: LinkItem) {
+  const startStr = link.startsAt ? formatIcsDate(link.startsAt) : "";
+  const endStr = link.endsAt ? formatIcsDate(link.endsAt) : link.startsAt ? formatIcsDate(link.startsAt + 7200) : "";
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Club Link Hub//Event Pass//EN",
+    "BEGIN:VEVENT",
+    `UID:event-${link.id}-${Date.now()}@clublink`,
+    `DTSTAMP:${formatIcsDate(Math.floor(Date.now() / 1000))}`,
+    `DTSTART:${startStr}`,
+    `DTEND:${endStr}`,
+    `SUMMARY:${link.label}`,
+    `DESCRIPTION:${link.url}`,
+    `LOCATION:${link.location || ""}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${link.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function getCountdownString(startsAt: number | null, endsAt: number | null): string | null {
+  if (!startsAt) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (startsAt > now) {
+    const diff = startsAt - now;
+    const days = Math.floor(diff / 86400);
+    const hours = Math.floor((diff % 86400) / 3600);
+    const mins = Math.floor((diff % 3600) / 60);
+    if (days > 0) return `Starts in ${days}d ${hours}h`;
+    if (hours > 0) return `Starts in ${hours}h ${mins}m`;
+    return `Starts in ${mins}m`;
+  }
+  if (endsAt && endsAt > now) {
+    return "Live Now";
+  }
+  if (!endsAt && now - startsAt < 14400) {
+    return "Live Now";
+  }
+  return "Concluded";
+}
+
+function AddToCalendarPopover({ link }: { link: LinkItem }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(!open);
+        }}
+        aria-label="Add to Calendar"
+        title="Add to Calendar"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+        style={{
+          borderRadius: "var(--radius)",
+          borderWidth: "var(--border-width)",
+          borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
+          background: "var(--surface)",
+          color: "var(--text)",
+        }}
+      >
+        <CalendarPlus className="h-3 w-3 opacity-70" />
+        <span className="font-mono text-[10px] uppercase tracking-wider">Save Date</span>
+        <ChevronDown className={cn("h-2.5 w-2.5 opacity-50 transition-transform duration-150", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
+          <div
+            className="absolute right-0 bottom-full mb-1.5 z-50 flex min-w-48 flex-col gap-1 p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150"
+            style={{
+              background: "var(--surface)",
+              borderRadius: "var(--card-radius)",
+              borderWidth: "var(--border-width)",
+              borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
+              boxShadow: "var(--card-shadow)",
+            }}
+          >
+            <div className="px-2.5 py-1 font-mono text-[9px] font-bold tracking-wider uppercase opacity-60" style={{ color: "var(--muted)" }}>
+              Add to Calendar
+            </div>
+            <a
+              href={generateGoogleCalendarUrl(link)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ borderRadius: "var(--radius)", color: "var(--text)" }}
+            >
+              <span>Google Calendar</span>
+              <ExternalLink className="h-3 w-3 opacity-50" />
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                downloadIcsFile(link);
+                setOpen(false);
+              }}
+              className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 text-left cursor-pointer"
+              style={{ borderRadius: "var(--radius)", color: "var(--text)" }}
+            >
+              <span>Apple / Outlook (.ics)</span>
+              <Download className="h-3 w-3 opacity-50" />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** Physical Event Ticket Pass (Clean Solid Aesthetics) */
 function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
   const dateInfo = getEventDateDetails(link.startsAt ?? null, link.endsAt ?? null);
@@ -361,6 +505,7 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
   const categoryTag = link.categoryTag?.trim() || "EVENT PASS";
   const passSerial = `#EVT-${String(link.id).padStart(4, "0")}`;
   const ctaText = link.ctaText?.trim() || "Get Pass / RSVP";
+  const countdownText = getCountdownString(link.startsAt ?? null, link.endsAt ?? null);
 
   return (
     <a
@@ -410,19 +555,35 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
             </div>
           )}
 
-          {statusBadge && (
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white shadow-sm ml-auto"
-              style={{
-                background: "#09090b",
-                borderRadius: "var(--radius)",
-                border: "1px solid rgba(255,255,255,0.2)",
-              }}
-            >
-              <span className={cn("h-2 w-2 rounded-full", statusBadge.dotColor)} />
-              <span className="font-mono text-[10px] tracking-wider uppercase">{statusBadge.label}</span>
-            </div>
-          )}
+          <div className="ml-auto flex items-center gap-1.5">
+            {countdownText && (
+              <div
+                className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white shadow-sm"
+                style={{
+                  background: "#09090b",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                }}
+              >
+                <Clock className="h-3 w-3 opacity-75" />
+                <span className="font-mono text-[10px] tracking-wider uppercase">{countdownText}</span>
+              </div>
+            )}
+
+            {statusBadge && (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white shadow-sm"
+                style={{
+                  background: "#09090b",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                }}
+              >
+                <span className={cn("h-2 w-2 rounded-full", statusBadge.dotColor)} />
+                <span className="font-mono text-[10px] tracking-wider uppercase">{statusBadge.label}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -482,7 +643,7 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
       </div>
 
       {/* Ticket Action Footer */}
-      <div className="flex items-center justify-between px-5 pb-4 pt-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-4 pt-1">
         <div
           className="flex items-center gap-2 font-mono text-[11px] font-semibold tracking-wider uppercase opacity-75"
           style={{ color: "var(--muted)" }}
@@ -491,15 +652,19 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
           <span>{statusBadge?.label || "RSVP OPEN"}</span>
         </div>
 
-        <div
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all duration-150 group-hover:opacity-90"
-          style={{
-            background: accent,
-            borderRadius: "var(--radius)",
-          }}
-        >
-          <span>{ctaText}</span>
-          <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        <div className="flex items-center gap-2">
+          {dateInfo && <AddToCalendarPopover link={link} />}
+
+          <div
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all duration-150 group-hover:opacity-90"
+            style={{
+              background: accent,
+              borderRadius: "var(--radius)",
+            }}
+          >
+            <span>{ctaText}</span>
+            <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </div>
         </div>
       </div>
     </a>
@@ -756,14 +921,261 @@ function DesktopQrBox({ url, accent }: { url: string; accent: string }) {
   );
 }
 
+function SearchAndFilterBar({
+  searchQuery,
+  onSearchChange,
+  categories,
+  selectedCategory,
+  onCategoryChange,
+  accent,
+}: {
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  categories: string[];
+  selectedCategory: string;
+  onCategoryChange: (cat: string) => void;
+  accent: string;
+}) {
+  return (
+    <div className="flex w-full flex-col gap-2.5">
+      <div className="relative w-full">
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 opacity-50" style={{ color: "var(--text)" }} />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search links, events, passes..."
+          className="w-full pl-9 pr-8 py-2 text-xs font-medium transition-all focus:outline-hidden"
+          style={{
+            borderRadius: "var(--radius)",
+            borderWidth: "var(--border-width)",
+            borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+            background: "var(--surface)",
+            color: "var(--text)",
+            boxShadow: "var(--card-shadow)",
+          }}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => onSearchChange("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 opacity-50 hover:opacity-100 cursor-pointer"
+            style={{ color: "var(--text)" }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {categories.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1">
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => onCategoryChange(cat)}
+                className="inline-flex items-center px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer"
+                style={{
+                  borderRadius: "var(--radius)",
+                  borderWidth: "var(--border-width)",
+                  borderColor: isSelected ? accent : "color-mix(in srgb, var(--text) 14%, transparent)",
+                  background: isSelected ? accent : "var(--surface)",
+                  color: isSelected ? "#ffffff" : "var(--muted)",
+                  boxShadow: "var(--card-shadow)",
+                }}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShareModal({
+  open,
+  onOpenChange,
+  url,
+  orgName,
+  accent,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  url: string;
+  orgName: string;
+  accent: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const svg = useMemo(() => renderSVG(url, { ecc: "M", border: 1 }), [url]);
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadQr = () => {
+    const blob = new Blob([svg], { type: "image/svg+xml" });
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = u;
+    a.download = `${orgName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-qr.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(u);
+  };
+
+  const shareNative = () => {
+    if (navigator.share) {
+      navigator
+        .share({
+          title: orgName,
+          url,
+        })
+        .catch(() => {});
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs" onClick={() => onOpenChange(false)} />
+      <div
+        className="fixed left-1/2 top-1/2 z-50 w-[90%] max-w-sm -translate-x-1/2 -translate-y-1/2 flex flex-col items-center p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+        style={{
+          background: "var(--surface)",
+          borderRadius: "var(--card-radius)",
+          borderWidth: "var(--border-width)",
+          borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
+          boxShadow: "var(--card-shadow)",
+          color: "var(--text)",
+        }}
+      >
+        <div className="flex w-full items-center justify-between pb-3">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-widest opacity-60">Share & QR Pass</span>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="p-1 opacity-60 hover:opacity-100 cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="my-3 flex h-44 w-44 items-center justify-center rounded-xl bg-white p-3 shadow-inner">
+          <div className="h-full w-full [&_svg]:h-full [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+        </div>
+
+        <h4 className="mt-1 text-center text-sm font-bold tracking-tight" style={{ fontFamily: "var(--font-heading)" }}>
+          {orgName}
+        </h4>
+        <p className="mt-0.5 truncate text-xs font-mono opacity-60 max-w-[260px]">{url}</p>
+
+        <div className="mt-5 flex w-full flex-col gap-2">
+          <button
+            type="button"
+            onClick={copyLink}
+            className="flex w-full items-center justify-center gap-2 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 cursor-pointer"
+            style={{
+              background: accent,
+              borderRadius: "var(--radius)",
+            }}
+          >
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            <span>{copied ? "Link Copied" : "Copy Link"}</span>
+          </button>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={downloadQr}
+              className="flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+              style={{
+                borderRadius: "var(--radius)",
+                borderWidth: "var(--border-width)",
+                borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+                color: "var(--text)",
+              }}
+            >
+              <Download className="h-3.5 w-3.5 opacity-60" />
+              <span>Download QR</span>
+            </button>
+
+            {typeof navigator !== "undefined" && navigator.share && (
+              <button
+                type="button"
+                onClick={shareNative}
+                className="flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                style={{
+                  borderRadius: "var(--radius)",
+                  borderWidth: "var(--border-width)",
+                  borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+                  color: "var(--text)",
+                }}
+              >
+                <Share2 className="h-3.5 w-3.5 opacity-60" />
+                <span>Share App</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 /** Renders the public page from a given data payload. Reused by the admin live preview. */
 export function PageShell({ data, interactive = true, embedded = false }: { data: PageData; interactive?: boolean; embedded?: boolean }) {
   const { theme, cssVars } = useTheme();
   const { profile, links } = data;
 
-  const featured = links.filter((l) => l.highlight === 1 && l.kind !== "event");
-  const events = links.filter((l) => l.kind === "event");
-  const regular = links.filter((l) => l.highlight !== 1 && l.kind !== "event");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    set.add("ALL");
+    if (links.some((l) => l.kind === "event")) set.add("EVENTS");
+    if (links.some((l) => l.highlight === 1 && l.kind !== "event")) set.add("SPOTLIGHT");
+    for (const l of links) {
+      if (l.categoryTag?.trim()) set.add(l.categoryTag.trim().toUpperCase());
+    }
+    return Array.from(set);
+  }, [links]);
+
+  const filteredLinks = useMemo(() => {
+    let result = links;
+    if (selectedCategory !== "ALL") {
+      if (selectedCategory === "EVENTS") {
+        result = result.filter((l) => l.kind === "event");
+      } else if (selectedCategory === "SPOTLIGHT") {
+        result = result.filter((l) => l.highlight === 1 && l.kind !== "event");
+      } else {
+        result = result.filter((l) => l.categoryTag?.trim().toUpperCase() === selectedCategory);
+      }
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (l) =>
+          l.label.toLowerCase().includes(q) ||
+          (l.location && l.location.toLowerCase().includes(q)) ||
+          (l.categoryTag && l.categoryTag.toLowerCase().includes(q)),
+      );
+    }
+    return result;
+  }, [links, searchQuery, selectedCategory]);
+
+  const featured = filteredLinks.filter((l) => l.highlight === 1 && l.kind !== "event");
+  const events = filteredLinks.filter((l) => l.kind === "event");
+  const regular = filteredLinks.filter((l) => l.highlight !== 1 && l.kind !== "event");
   const accent = theme.palette.accent;
   const configured = !!(profile.orgName || links.length > 0 || profile.socials.length > 0);
   const url = typeof window !== "undefined" ? window.location.origin : "";
@@ -811,6 +1223,19 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
         )}
 
         <SocialDock socials={profile.socials} accent={accent} />
+
+        {links.length > 3 && (
+          <div className="mt-5 w-full">
+            <SearchAndFilterBar
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+              accent={accent}
+            />
+          </div>
+        )}
 
         <div className="mt-6 flex w-full flex-col gap-3.5">
           {featured.map((link) => (
@@ -875,12 +1300,42 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
 
               <SocialDock socials={profile.socials} accent={accent} />
 
-              {interactive && <DesktopQrBox url={url} accent={accent} />}
+              {interactive && (
+                <div className="mt-4 flex w-full flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShareModalOpen(true)}
+                    className="flex w-full items-center justify-center gap-2 py-2 text-xs font-semibold transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                    style={{
+                      borderRadius: "var(--radius)",
+                      borderWidth: "var(--border-width)",
+                      borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    <Share2 className="h-3.5 w-3.5 opacity-70" />
+                    <span>Share & QR Pass</span>
+                  </button>
+
+                  <DesktopQrBox url={url} accent={accent} />
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Column: Events, Spotlight & Links Feed */}
           <div className="md:col-span-7 lg:col-span-7 flex flex-col gap-6">
+            {links.length > 2 && (
+              <SearchAndFilterBar
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                accent={accent}
+              />
+            )}
+
             {/* Featured Links */}
             {featured.length > 0 && (
               <div className="flex flex-col gap-3">
@@ -930,6 +1385,14 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
           </div>
         </div>
       </main>
+
+      <ShareModal
+        open={shareModalOpen}
+        onOpenChange={setShareModalOpen}
+        url={url}
+        orgName={profile.orgName}
+        accent={accent}
+      />
     </div>
   );
 }

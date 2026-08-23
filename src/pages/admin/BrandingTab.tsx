@@ -4,11 +4,25 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Check, ImageOff, ImageIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  Check,
+  Database,
+  Download,
+  ImageOff,
+  ImageIcon,
+  Loader2,
+  Moon,
+  Plus,
+  Sun,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import {
   getAdminData,
+  getBackupData,
   removeAvatar,
   removeBanner,
+  restoreBackupData,
   updateProfile,
   uploadAvatar,
   uploadBanner,
@@ -189,6 +203,50 @@ export default function BrandingTab() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Banner removal failed"),
   });
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportBackup = async () => {
+    try {
+      setIsExporting(true);
+      const backup = await getBackupData();
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup-${data?.profile?.orgName?.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "clublink"}-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Backup downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Backup failed");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed || (!parsed.profile && !parsed.links)) {
+        toast.error("Invalid backup file format");
+        return;
+      }
+      await restoreBackupData(parsed);
+      queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      hydrated.current = false;
+      toast.success("Backup restored successfully");
+    } catch {
+      toast.error("Failed to restore backup file");
+    } finally {
+      e.target.value = "";
+    }
+  };
 
   const addSocial = () => {
     const url = newUrl.trim();
@@ -706,6 +764,55 @@ export default function BrandingTab() {
           </CardContent>
         </Card>
 
+        {/* Backup & Disaster Recovery */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <Database className="h-4 w-4" />
+              Backup & Disaster Recovery
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">
+              Download a complete JSON snapshot of your organization profile, links, themes, and configuration, or restore from a previous backup.
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportBackup}
+                disabled={isExporting}
+                className="gap-1.5"
+              >
+                {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                Export Backup (JSON)
+              </Button>
+
+              <label className="inline-flex">
+                <input
+                  type="file"
+                  accept=".json"
+                  className="sr-only"
+                  onChange={handleRestoreBackup}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  className="gap-1.5 cursor-pointer"
+                >
+                  <span>
+                    <Upload className="h-3.5 w-3.5" />
+                    Restore Backup (JSON)
+                  </span>
+                </Button>
+              </label>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Save */}
         <div className="flex items-center justify-end gap-3">
           <SavedBadge />
@@ -719,9 +826,30 @@ export default function BrandingTab() {
       {/* Scrollable Live Preview */}
       <div className="lg:sticky lg:top-6">
         <div className="flex h-[84vh] max-h-[860px] min-h-[520px] flex-col overflow-hidden rounded-2xl border shadow-xl bg-background">
-          <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground">
+          <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground">
             <span className="font-semibold">Live Preview</span>
-            <span className="font-mono text-[10px] uppercase opacity-75">Scrollable Frame</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setDraftTheme((t) => ({ ...t, mode: "light" }))}
+                className={cn(
+                  "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
+                  draftTheme.mode === "light" ? "bg-background text-foreground shadow-xs" : "opacity-60 hover:opacity-100",
+                )}
+              >
+                <Sun className="h-3 w-3" /> Light
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftTheme((t) => ({ ...t, mode: "dark" }))}
+                className={cn(
+                  "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
+                  draftTheme.mode === "dark" ? "bg-background text-foreground shadow-xs" : "opacity-60 hover:opacity-100",
+                )}
+              >
+                <Moon className="h-3 w-3" /> Dark
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <ThemeProvider theme={draftTheme}>

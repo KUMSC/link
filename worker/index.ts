@@ -67,7 +67,7 @@ app.onError((err, c) => {
 });
 
 async function loadPublic(env: Env) {
-  const [profile, links] = await Promise.all([getProfile(env.DB), getLinks(env.DB)]);
+  const [profile, links] = await Promise.all([getProfile(env.DB), getActivePublicLinks(env.DB)]);
   return { profile, links };
 }
 
@@ -79,11 +79,13 @@ app.get("/", async (c) => {
     (async () => {
       const hash = await visitorHash(c.req.raw);
       const ua = nullable(c.req.header("User-Agent"));
+      const srcTag = nullable(c.req.query("src") || c.req.query("utm_source") || c.req.query("ref"));
       await recordView(c.env.DB, {
         visitorHash: hash,
         referer: nullable(c.req.header("Referer")),
         country: (c.req.raw as Request & { cf?: { country?: string | null } }).cf?.country ?? null,
         device: detectDevice(ua),
+        sourceTag: srcTag,
       });
     })(),
   );
@@ -108,11 +110,13 @@ app.get("/api/public", async (c) => {
     (async () => {
       const hash = await visitorHash(c.req.raw);
       const ua = nullable(c.req.header("User-Agent"));
+      const srcTag = nullable(c.req.query("src") || c.req.query("utm_source") || c.req.query("ref"));
       await recordView(c.env.DB, {
         visitorHash: hash,
         referer: nullable(c.req.header("Referer")),
         country: (c.req.raw as Request & { cf?: { country?: string | null } }).cf?.country ?? null,
         device: detectDevice(ua),
+        sourceTag: srcTag,
       });
     })(),
   );
@@ -230,11 +234,13 @@ app.get("/api/click/:id", async (c) => {
     (async () => {
       const hash = await visitorHash(c.req.raw);
       const ua = nullable(c.req.header("User-Agent"));
+      const srcTag = nullable(c.req.query("src") || c.req.query("utm_source"));
       await recordClick(c.env.DB, id, {
         referer: nullable(c.req.header("Referer")),
         country: (c.req.raw as Request & { cf?: { country?: string | null } }).cf?.country ?? null,
         device: detectDevice(ua),
         visitorHash: hash,
+        sourceTag: srcTag,
       });
       logger.info("link_click", { link_id: id, label: link.label });
     })(),
@@ -354,6 +360,9 @@ interface LinkBody {
   status?: "auto" | "open" | "closed" | "sold_out" | "free_entry" | "invite_only" | "waitlist";
   categoryTag?: string | null;
   ctaText?: string | null;
+  publishAt?: number | null;
+  expiresAt?: number | null;
+  archived?: number;
 }
 
 /** Deletes an R2 object, tolerating a missing object. */
@@ -378,6 +387,9 @@ app.post("/api/admin/links", async (c) => {
     status: body.status,
     categoryTag: body.categoryTag?.trim() || null,
     ctaText: body.ctaText?.trim() || null,
+    publishAt: body.publishAt,
+    expiresAt: body.expiresAt,
+    archived: body.archived ?? 0,
   });
   c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("link_created", { email: c.get("email"), link_id: link.id, label: link.label });
@@ -401,6 +413,9 @@ app.put("/api/admin/links/:id", async (c) => {
     status: body.status,
     categoryTag: body.categoryTag === undefined ? undefined : body.categoryTag?.trim() || null,
     ctaText: body.ctaText === undefined ? undefined : body.ctaText?.trim() || null,
+    publishAt: body.publishAt,
+    expiresAt: body.expiresAt,
+    archived: body.archived,
   });
   if (!link) return c.notFound();
   // Replace-then-cleanup: drop the old thumbnail when it changed or was removed.
@@ -409,6 +424,15 @@ app.put("/api/admin/links/:id", async (c) => {
   }
   c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("link_updated", { email: c.get("email"), link_id: id });
+  return c.json({ link });
+});
+
+app.post("/api/admin/links/:id/duplicate", async (c) => {
+  const id = Number(c.req.param("id"));
+  const link = await duplicateLink(c.env.DB, id);
+  if (!link) return c.notFound();
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
+  logger.info("link_duplicated", { email: c.get("email"), original_id: id, new_id: link.id });
   return c.json({ link });
 });
 
@@ -470,7 +494,7 @@ app.get("/api/admin/stats", async (c) => {
   const rangeDays = rangeParam === "all" ? -1 : Number(rangeParam ?? 30) || 30;
   const windowDays = rangeDays > 0 ? rangeDays : 30;
 
-  const [totals, daily, total, views, uniques, referrers, countries, devices] = await Promise.all([
+  const [totals, daily, total, views, uniques, referrers, countries, devices, campaigns] = await Promise.all([
     getClickTotals(c.env.DB),
     getDailyClicks(c.env.DB, windowDays),
     getTotalClicks(c.env.DB, rangeDays > 0 ? rangeDays : undefined),
@@ -479,6 +503,7 @@ app.get("/api/admin/stats", async (c) => {
     getReferrerBreakdown(c.env.DB, rangeDays > 0 ? rangeDays : 3650, new URL(c.req.url).origin, 10),
     getBreakdown(c.env.DB, "country", "clicks", windowDays, 10),
     getBreakdown(c.env.DB, "device", "clicks", windowDays, 10),
+    getCampaignBreakdown(c.env.DB, windowDays, 10),
   ]);
   const ctr = views > 0 ? Math.round((total / views) * 1000) / 10 : 0;
 
@@ -492,6 +517,7 @@ app.get("/api/admin/stats", async (c) => {
     referrers,
     countries,
     devices,
+    campaigns,
     rangeDays,
   });
 });
@@ -501,7 +527,7 @@ app.get("/api/admin/stats/export", async (c) => {
   const rangeDays = rangeParam === "all" ? 3650 : Number(rangeParam ?? 30) || 30;
   const rows = await getAllClicks(c.env.DB, rangeDays);
   const csv = [
-    "id,link,clicked_at,referer,country,device",
+    "id,link,clicked_at,referer,country,device,source_tag",
     ...rows.map((r) =>
       [
         r.id,
@@ -510,13 +536,35 @@ app.get("/api/admin/stats/export", async (c) => {
         `"${String(r.referer ?? "").replace(/"/g, '""')}"`,
         String(r.country ?? ""),
         String(r.device ?? ""),
+        `"${String(r.source_tag ?? "").replace(/"/g, '""')}"`,
       ].join(","),
     ),
   ].join("\n");
   return c.body(csv, 200, {
     "Content-Type": "text/csv; charset=utf-8",
-    "Content-Disposition": `attachment; filename="clicks-${rangeDays}d.csv"`,
+    "Content-Disposition": `attachment; filename="analytics-${rangeDays}d.csv"`,
   });
+});
+
+app.get("/api/admin/backup", async (c) => {
+  const [profile, links] = await Promise.all([getProfile(c.env.DB), getLinks(c.env.DB)]);
+  return c.json({
+    version: 1,
+    exportedAt: Date.now(),
+    profile,
+    links,
+  });
+});
+
+app.post("/api/admin/restore", async (c) => {
+  const body = await c.req.json<{ profile?: Partial<Profile>; links?: Partial<LinkItem>[] }>();
+  if (!body || (!body.profile && !body.links)) {
+    return c.json({ error: "Invalid backup data" }, 400);
+  }
+  await restoreBackup(c.env.DB, { profile: body.profile ?? {}, links: body.links ?? [] });
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
+  logger.info("backup_restored", { email: c.get("email") });
+  return c.json({ ok: true });
 });
 
 // ---- Fallbacks -----------------------------------------------------------
