@@ -100,6 +100,36 @@ export interface Profile {
 
 export type LinkKind = "link" | "event";
 
+export type EventStatus =
+  | "auto"
+  | "open"
+  | "closed"
+  | "sold_out"
+  | "free_entry"
+  | "invite_only"
+  | "waitlist";
+
+export const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
+  auto: "Auto (From Date / Time)",
+  open: "RSVP Open (Register Now)",
+  closed: "RSVP Closed",
+  sold_out: "Sold Out",
+  free_entry: "Free Entry (No Ticket)",
+  invite_only: "Invite Only",
+  waitlist: "Waitlist",
+};
+
+export const EVENT_CATEGORY_PRESETS = [
+  "WORKSHOP",
+  "HACKATHON",
+  "MEETUP",
+  "FLAGSHIP FEST",
+  "WEBINAR",
+  "COMPETITION",
+  "GUEST TALK",
+  "COMMUNITY",
+] as const;
+
 export interface LinkItem {
   id: number;
   label: string;
@@ -112,6 +142,9 @@ export interface LinkItem {
   endsAt: number | null;
   location: string | null;
   thumbnailKey: string | null;
+  status?: EventStatus | null;
+  categoryTag?: string | null;
+  ctaText?: string | null;
   createdAt: number;
 }
 

@@ -28,7 +28,8 @@ import {
 import { LINK_ICON_CHOICES, SOCIAL_ICON_CHOICES, validateUrl } from "../../lib/platforms";
 import { LinkIconBadge } from "../../lib/link-icon";
 import { cn } from "../../lib/utils";
-import type { LinkItem, LinkKind } from "../../lib/types";
+import type { EventStatus, LinkItem, LinkKind } from "../../lib/types";
+import { EVENT_CATEGORY_PRESETS, EVENT_STATUS_LABELS } from "../../lib/types";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -69,6 +70,9 @@ const linkSchema = z
     startsAt: z.string().optional(),
     endsAt: z.string().optional(),
     location: z.string().optional(),
+    status: z.enum(["auto", "open", "closed", "sold_out", "free_entry", "invite_only", "waitlist"]).optional(),
+    categoryTag: z.string().optional(),
+    ctaText: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.kind === "event" && !v.startsAt && !v.endsAt) {
@@ -106,7 +110,16 @@ function LinkEditor({
   const kind = editing?.kind ?? "link";
   const form = useForm<LinkForm>({
     resolver: zodResolver(linkSchema),
-    defaultValues: { label: "", url: "", highlight: false, kind: "link", icon: null },
+    defaultValues: {
+      label: "",
+      url: "",
+      highlight: false,
+      kind: "link",
+      icon: null,
+      status: "auto",
+      categoryTag: "",
+      ctaText: "",
+    },
   });
   const [thumbFile, setThumbFile] = useState<File | null>(null);
   const [thumbPreview, setThumbPreview] = useState<string | null>(null);
@@ -123,6 +136,9 @@ function LinkEditor({
         startsAt: toLocal(editing?.startsAt),
         endsAt: toLocal(editing?.endsAt),
         location: editing?.location ?? "",
+        status: editing?.status ?? "auto",
+        categoryTag: editing?.categoryTag ?? "",
+        ctaText: editing?.ctaText ?? "",
       });
       setThumbFile(null);
       setThumbPreview(editing?.thumbnailKey ? `/api/thumb/${editing.id}` : null);
@@ -161,6 +177,9 @@ function LinkEditor({
         startsAt: toUnix(values.startsAt),
         endsAt: toUnix(values.endsAt),
         location: values.location?.trim() || null,
+        status: values.status ?? "auto",
+        categoryTag: values.categoryTag?.trim() || null,
+        ctaText: values.ctaText?.trim() || null,
       };
       const result = editing ? await updateLink(editing.id, payload) : await createLink(payload);
       // Thumbnail follows the link row: upload a newly picked file, or remove
@@ -183,10 +202,10 @@ function LinkEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit link" : "Add link"}</DialogTitle>
-          <DialogDescription>Links open externally; events also show a date, time and place.</DialogDescription>
+          <DialogTitle>{editing ? "Edit item" : "Add item"}</DialogTitle>
+          <DialogDescription>Links open externally; event passes show custom badge, dates, place & RSVP status.</DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="flex flex-col gap-4">
           <div className="grid gap-2">
@@ -196,28 +215,28 @@ function LinkEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="link">Link</SelectItem>
-                <SelectItem value="event">Event</SelectItem>
+                <SelectItem value="link">Standard Link</SelectItem>
+                <SelectItem value="event">Event Pass / Ticket</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="label">Label</Label>
-            <Input id="label" placeholder={watchedKind === "event" ? "Tech Talk — April 10" : "Event Registration Form"} {...form.register("label")} />
+            <Label htmlFor="label">Title / Event Name</Label>
+            <Input id="label" placeholder={watchedKind === "event" ? "Tech Summit 2026" : "Official Website"} {...form.register("label")} />
             {form.formState.errors.label && (
               <p className="text-xs text-destructive">{form.formState.errors.label.message}</p>
             )}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="url">URL</Label>
-            <Input id="url" placeholder="https://forms.google.com/…" {...form.register("url")} />
+            <Label htmlFor="url">Destination / RSVP URL</Label>
+            <Input id="url" placeholder="https://..." {...form.register("url")} />
             {form.formState.errors.url && (
               <p className="text-xs text-destructive">{form.formState.errors.url.message}</p>
             )}
           </div>
 
-          {/* Thumbnail */}
+          {/* Thumbnail / Poster */}
           <div className="flex items-center gap-3 rounded-lg border p-3">
             <div
               className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border"
@@ -231,7 +250,7 @@ function LinkEditor({
               )}
             </div>
             <div className="flex flex-1 flex-col gap-1.5">
-              <p className="text-sm font-medium">Thumbnail</p>
+              <p className="text-sm font-medium">{watchedKind === "event" ? "Event Poster / Cover" : "Thumbnail"}</p>
               <label className="cursor-pointer text-xs font-medium text-muted-foreground underline-offset-2 hover:underline">
                 {hasThumb ? "Replace image" : "Choose image"}
                 <input
@@ -241,7 +260,7 @@ function LinkEditor({
                   onChange={(e) => pickThumb(e.target.files?.[0])}
                 />
               </label>
-              <p className="text-[11px] text-muted-foreground">PNG/JPG/WebP · up to 5MB · shown on the card</p>
+              <p className="text-[11px] text-muted-foreground">PNG/JPG/WebP · up to 5MB · shown on top of the card</p>
             </div>
             {hasThumb && (
               <Button type="button" variant="outline" size="icon" onClick={clearThumb} aria-label="Remove thumbnail">
@@ -251,18 +270,82 @@ function LinkEditor({
           </div>
 
           {watchedKind === "event" && (
-            <div className="grid gap-3 rounded-lg border p-3">
+            <div className="grid gap-3.5 rounded-xl border p-3.5 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold font-mono tracking-wider uppercase text-foreground">Event Pass Customization</span>
+              </div>
+
+              {/* RSVP Status */}
               <div className="grid gap-2">
-                <Label htmlFor="startsAt">Starts at</Label>
-                <Input id="startsAt" type="datetime-local" {...form.register("startsAt")} />
+                <Label htmlFor="status">RSVP / Registration Status</Label>
+                <Select
+                  value={form.watch("status") || "auto"}
+                  onValueChange={(v) => form.setValue("status", v as EventStatus)}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(EVENT_STATUS_LABELS) as EventStatus[]).map((st) => (
+                      <SelectItem key={st} value={st}>
+                        {EVENT_STATUS_LABELS[st]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Category / Badge */}
+              <div className="grid gap-2">
+                <Label htmlFor="categoryTag">Badge / Category Tag</Label>
+                <div className="flex flex-wrap gap-1.5 mb-1">
+                  {EVENT_CATEGORY_PRESETS.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => form.setValue("categoryTag", cat)}
+                      className={cn(
+                        "rounded-md border px-2 py-0.5 text-[10px] font-mono font-semibold transition-colors",
+                        form.watch("categoryTag") === cat
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-background text-muted-foreground hover:border-foreground",
+                      )}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  id="categoryTag"
+                  placeholder="e.g. WORKSHOP, HACKATHON, #EVT-01"
+                  {...form.register("categoryTag")}
+                />
+              </div>
+
+              {/* CTA Button Text */}
+              <div className="grid gap-2">
+                <Label htmlFor="ctaText">Action Button Text</Label>
+                <Input
+                  id="ctaText"
+                  placeholder="Default: Get Pass / RSVP (or e.g. Register Free, Join Discord)"
+                  {...form.register("ctaText")}
+                />
+              </div>
+
+              {/* Timing & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="startsAt">Starts at</Label>
+                  <Input id="startsAt" type="datetime-local" {...form.register("startsAt")} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="endsAt">Ends at</Label>
+                  <Input id="endsAt" type="datetime-local" {...form.register("endsAt")} />
+                </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="endsAt">Ends at</Label>
-                <Input id="endsAt" type="datetime-local" {...form.register("endsAt")} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" placeholder="Room 301, Science Block" {...form.register("location")} />
+                <Label htmlFor="location">Location / Venue</Label>
+                <Input id="location" placeholder="Auditorium / Discord Stage / Zoom" {...form.register("location")} />
               </div>
               {form.formState.errors.startsAt && (
                 <p className="text-xs text-destructive">{form.formState.errors.startsAt.message}</p>

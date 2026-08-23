@@ -325,9 +325,40 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
   );
 }
 
+function getEventStatusBadge(
+  status: LinkItem["status"],
+  dateInfo: ReturnType<typeof getEventDateDetails>,
+) {
+  if (status && status !== "auto") {
+    switch (status) {
+      case "open":
+        return { label: "RSVP OPEN", dotColor: "bg-emerald-400" };
+      case "closed":
+        return { label: "RSVP CLOSED", dotColor: "bg-zinc-400" };
+      case "sold_out":
+        return { label: "SOLD OUT", dotColor: "bg-rose-400" };
+      case "free_entry":
+        return { label: "FREE ENTRY", dotColor: "bg-sky-400" };
+      case "invite_only":
+        return { label: "INVITE ONLY", dotColor: "bg-purple-400" };
+      case "waitlist":
+        return { label: "WAITLIST", dotColor: "bg-amber-400" };
+    }
+  }
+  if (!dateInfo) return null;
+  return {
+    label: dateInfo.statusLabel,
+    dotColor: dateInfo.isLive ? "animate-pulse bg-emerald-400" : dateInfo.isPast ? "bg-zinc-400" : "bg-white",
+  };
+}
+
 /** Physical Event Ticket Pass (Clean Solid Aesthetics) */
 function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
   const dateInfo = getEventDateDetails(link.startsAt ?? null, link.endsAt ?? null);
+  const statusBadge = getEventStatusBadge(link.status, dateInfo);
+  const categoryTag = link.categoryTag?.trim() || "EVENT PASS";
+  const passSerial = `#EVT-${String(link.id).padStart(4, "0")}`;
+  const ctaText = link.ctaText?.trim() || "Get Pass / RSVP";
 
   return (
     <a
@@ -377,22 +408,17 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
             </div>
           )}
 
-          {dateInfo && (
+          {statusBadge && (
             <div
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white shadow-sm ml-auto"
               style={{
                 background: "#09090b",
                 borderRadius: "var(--radius)",
                 border: "1px solid rgba(255,255,255,0.2)",
               }}
             >
-              <span
-                className={cn(
-                  "h-2 w-2 rounded-full",
-                  dateInfo.isLive ? "animate-pulse bg-emerald-400" : dateInfo.isPast ? "bg-zinc-400" : "bg-white",
-                )}
-              />
-              <span className="font-mono text-[10px] tracking-wider uppercase">{dateInfo.statusLabel}</span>
+              <span className={cn("h-2 w-2 rounded-full", statusBadge.dotColor)} />
+              <span className="font-mono text-[10px] tracking-wider uppercase">{statusBadge.label}</span>
             </div>
           )}
         </div>
@@ -403,9 +429,9 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
         <div className="flex items-center justify-between font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: "var(--muted)" }}>
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-            <span>EVENT PASS</span>
+            <span className="tracking-wider">{categoryTag}</span>
           </span>
-          <span>#EVT-{String(link.id).padStart(4, "0")}</span>
+          <span className="opacity-70">{passSerial}</span>
         </div>
 
         <h3
@@ -460,7 +486,7 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
           style={{ color: "var(--muted)" }}
         >
           <span className="inline-block h-2 w-2 rounded-full" style={{ background: accent }} />
-          <span>{dateInfo?.isLive ? "LIVE NOW" : dateInfo?.isPast ? "CONCLUDED" : "RSVP OPEN"}</span>
+          <span>{statusBadge?.label || "RSVP OPEN"}</span>
         </div>
 
         <div
@@ -470,7 +496,7 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
             borderRadius: "var(--radius)",
           }}
         >
-          <span>View Event / RSVP</span>
+          <span>{ctaText}</span>
           <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </div>
       </div>

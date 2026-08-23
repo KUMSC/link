@@ -49,6 +49,9 @@ const COLUMN_ADDITIONS: Record<string, string[]> = {
     "ends_at INTEGER",
     "location TEXT",
     "thumbnail_key TEXT",
+    "status TEXT DEFAULT 'auto'",
+    "category_tag TEXT",
+    "cta_text TEXT",
   ],
   clicks: ["country TEXT", "device TEXT", "visitor_hash TEXT"],
 };

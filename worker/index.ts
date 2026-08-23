@@ -277,6 +277,9 @@ interface LinkBody {
   endsAt?: number | null;
   location?: string | null;
   thumbnailKey?: string | null;
+  status?: "auto" | "open" | "closed" | "sold_out" | "free_entry" | "invite_only" | "waitlist";
+  categoryTag?: string | null;
+  ctaText?: string | null;
 }
 
 /** Deletes an R2 object, tolerating a missing object. */
@@ -298,6 +301,9 @@ app.post("/api/admin/links", async (c) => {
     endsAt: body.endsAt,
     location: body.location,
     thumbnailKey: body.thumbnailKey,
+    status: body.status,
+    categoryTag: body.categoryTag?.trim() || null,
+    ctaText: body.ctaText?.trim() || null,
   });
   c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("link_created", { email: c.get("email"), link_id: link.id, label: link.label });
@@ -318,6 +324,9 @@ app.put("/api/admin/links/:id", async (c) => {
     endsAt: body.endsAt,
     location: body.location,
     thumbnailKey: body.thumbnailKey,
+    status: body.status,
+    categoryTag: body.categoryTag === undefined ? undefined : body.categoryTag?.trim() || null,
+    ctaText: body.ctaText === undefined ? undefined : body.ctaText?.trim() || null,
   });
   if (!link) return c.notFound();
   // Replace-then-cleanup: drop the old thumbnail when it changed or was removed.
