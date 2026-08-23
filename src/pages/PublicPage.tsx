@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import {
   ArrowUpRight,
   Calendar,
+  ChevronDown,
   Copy,
   MapPin,
   QrCode,
@@ -217,6 +218,8 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
         if (!isMulti) {
           const single = items[0]!;
           const tooltip = single.label ? `${platformName} (${single.label})` : platformName;
+          const hasLabel = !!single.label?.trim();
+
           return (
             <a
               key={`${platform}-0`}
@@ -225,7 +228,10 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
               rel="noopener noreferrer"
               aria-label={tooltip}
               title={tooltip}
-              className="group flex h-10 w-10 items-center justify-center transition-all duration-150 hover:-translate-y-0.5"
+              className={cn(
+                "group inline-flex items-center justify-center transition-all duration-150 hover:-translate-y-0.5",
+                hasLabel ? "h-10 gap-2 px-3 text-xs font-semibold" : "h-10 w-10",
+              )}
               style={{
                 borderRadius: "var(--radius)",
                 borderWidth: "var(--border-width)",
@@ -245,7 +251,8 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
                 (e.currentTarget as HTMLElement).style.background = "var(--surface)";
               }}
             >
-              <PlatformIcon platform={platform} size={18} />
+              <PlatformIcon platform={platform} size={hasLabel ? 16 : 18} />
+              {hasLabel && <span className="truncate max-w-[130px]">{single.label}</span>}
             </a>
           );
         }
@@ -257,9 +264,9 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
             <button
               type="button"
               onClick={() => setActivePlatform(isOpen ? null : platform)}
-              aria-label={`${platformName} (${items.length} channels)`}
-              title={`${platformName} (${items.length} channels)`}
-              className="group relative flex h-10 w-10 items-center justify-center transition-all duration-150 hover:-translate-y-0.5"
+              aria-label={`${platformName} (${items.length} accounts)`}
+              title={`${platformName} (${items.length} accounts)`}
+              className="group relative inline-flex h-10 items-center gap-2 px-3 text-xs font-semibold transition-all duration-150 hover:-translate-y-0.5 cursor-pointer"
               style={{
                 borderRadius: "var(--radius)",
                 borderWidth: "var(--border-width)",
@@ -269,13 +276,15 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
                 boxShadow: "var(--card-shadow)",
               }}
             >
-              <PlatformIcon platform={platform} size={18} />
+              <PlatformIcon platform={platform} size={16} />
+              <span>{platformName}</span>
               <span
-                className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white shadow-xs"
+                className="flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white shadow-xs"
                 style={{ background: accent }}
               >
                 {items.length}
               </span>
+              <ChevronDown className={cn("h-3 w-3 transition-transform duration-200 opacity-60", isOpen && "rotate-180")} />
             </button>
 
             {isOpen && (
@@ -286,7 +295,7 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
                   aria-hidden
                 />
                 <div
-                  className="absolute left-1/2 bottom-full mb-2 z-50 -translate-x-1/2 flex min-w-44 flex-col gap-1 p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150"
+                  className="absolute left-1/2 bottom-full mb-2 z-50 -translate-x-1/2 flex min-w-48 flex-col gap-1 p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150"
                   style={{
                     background: "var(--surface)",
                     borderRadius: "var(--card-radius)",
@@ -295,8 +304,8 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
                     boxShadow: "var(--card-shadow)",
                   }}
                 >
-                  <div className="px-2 py-1 font-mono text-[9px] font-bold tracking-wider uppercase opacity-60" style={{ color: "var(--muted)" }}>
-                    {platformName} Channels
+                  <div className="px-2.5 py-1 font-mono text-[9px] font-bold tracking-wider uppercase opacity-60" style={{ color: "var(--muted)" }}>
+                    {platformName} Channels ({items.length})
                   </div>
                   {items.map((item, idx) => (
                     <a
@@ -305,13 +314,16 @@ function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: 
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => setActivePlatform(null)}
-                      className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      className="flex items-center justify-between gap-2.5 px-3 py-2 text-xs font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                       style={{
                         borderRadius: "var(--radius)",
                         color: "var(--text)",
                       }}
                     >
-                      <span className="truncate">{item.label || `${platformName} ${idx + 1}`}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <PlatformIcon platform={platform} size={14} />
+                        <span className="truncate font-semibold">{item.label || `${platformName} #${idx + 1}`}</span>
+                      </div>
                       <ArrowUpRight className="h-3 w-3 shrink-0 opacity-50" />
                     </a>
                   ))}
