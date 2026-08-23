@@ -823,104 +823,6 @@ function EmptyState({ accent }: { accent: string }) {
   );
 }
 
-/** Desktop Integrated QR Connect Box */
-function DesktopQrBox({ url, accent }: { url: string; accent: string }) {
-  const [copied, setCopied] = useState(false);
-  const svg = useMemo(() => renderSVG(url, { ecc: "M", border: 1 }), [url]);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const shareUrl = encodeURIComponent(url);
-
-  return (
-    <div
-      className="mt-6 hidden md:flex w-full flex-col items-center gap-3.5 p-4 shadow-sm"
-      style={{
-        background: "var(--surface)",
-        borderRadius: "var(--card-radius)",
-        borderWidth: "var(--border-width)",
-        borderColor: "color-mix(in srgb, var(--text) 14%, transparent)",
-        boxShadow: "var(--card-shadow)",
-      }}
-    >
-      <div className="flex w-full items-center justify-between font-mono text-[10px] font-bold tracking-widest uppercase opacity-70" style={{ color: "var(--muted)" }}>
-        <span className="flex items-center gap-1.5">
-          <QrCode className="h-3.5 w-3.5" style={{ color: accent }} />
-          <span>SCAN ON MOBILE</span>
-        </span>
-        <span>// CONNECT</span>
-      </div>
-
-      <div className="flex items-center gap-4 w-full">
-        <div
-          className="bg-white p-2 shrink-0 border"
-          style={{
-            borderRadius: "var(--radius)",
-            borderColor: "color-mix(in srgb, var(--text) 12%, transparent)",
-          }}
-        >
-          <div className="h-20 w-20" dangerouslySetInnerHTML={{ __html: svg }} />
-        </div>
-
-        <div className="flex flex-1 flex-col gap-2 min-w-0">
-          <button
-            onClick={copy}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all hover:opacity-85"
-            style={{
-              borderRadius: "var(--radius)",
-              borderWidth: "var(--border-width)",
-              borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
-              color: "var(--text)",
-            }}
-          >
-            {copied ? <span className="text-emerald-500 font-bold">Copied!</span> : <>
-              <Copy className="h-3 w-3" />
-              <span>Copy link</span>
-            </>}
-          </button>
-
-          <div className="flex gap-1.5">
-            <a
-              href={`https://x.com/intent/post?url=${shareUrl}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 py-1.5 text-center text-[11px] font-semibold transition-opacity hover:opacity-80 border"
-              style={{
-                borderRadius: "var(--radius)",
-                borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
-                color: "var(--muted)",
-              }}
-            >
-              X
-            </a>
-            <a
-              href={`https://wa.me/?text=${shareUrl}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 py-1.5 text-center text-[11px] font-semibold transition-opacity hover:opacity-80 border"
-              style={{
-                borderRadius: "var(--radius)",
-                borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
-                color: "var(--muted)",
-              }}
-            >
-              WhatsApp
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function SearchAndFilterBar({
   searchQuery,
   onSearchChange,
@@ -1224,7 +1126,7 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
 
         <SocialDock socials={profile.socials} accent={accent} />
 
-        {links.length > 3 && (
+        {links.length > 0 && (
           <div className="mt-5 w-full">
             <SearchAndFilterBar
               searchQuery={searchQuery}
@@ -1301,31 +1203,28 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
               <SocialDock socials={profile.socials} accent={accent} />
 
               {interactive && (
-                <div className="mt-4 flex w-full flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShareModalOpen(true)}
-                    className="flex w-full items-center justify-center gap-2 py-2 text-xs font-semibold transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-                    style={{
-                      borderRadius: "var(--radius)",
-                      borderWidth: "var(--border-width)",
-                      borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
-                      color: "var(--text)",
-                    }}
-                  >
-                    <Share2 className="h-3.5 w-3.5 opacity-70" />
-                    <span>Share & QR Pass</span>
-                  </button>
-
-                  <DesktopQrBox url={url} accent={accent} />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShareModalOpen(true)}
+                  className="mt-5 flex w-full items-center justify-center gap-2 py-2.5 text-xs font-semibold shadow-xs transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                  style={{
+                    borderRadius: "var(--radius)",
+                    borderWidth: "var(--border-width)",
+                    borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+                    color: "var(--text)",
+                    background: "var(--surface)",
+                  }}
+                >
+                  <Share2 className="h-3.5 w-3.5 opacity-70" />
+                  <span className="font-mono text-[11px] font-bold uppercase tracking-wider">Share & QR Pass</span>
+                </button>
               )}
             </div>
           </div>
 
           {/* Right Column: Events, Spotlight & Links Feed */}
           <div className="md:col-span-7 lg:col-span-7 flex flex-col gap-6">
-            {links.length > 2 && (
+            {links.length > 0 && (
               <SearchAndFilterBar
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
@@ -1375,13 +1274,6 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
             )}
 
             {!configured && <EmptyState accent={accent} />}
-
-            {/* Mobile Share Footer */}
-            {interactive && (
-              <div className="flex md:hidden w-full justify-center">
-                <MobileShareFooter accent={accent} />
-              </div>
-            )}
           </div>
         </div>
       </main>
@@ -1394,167 +1286,6 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
         accent={accent}
       />
     </div>
-  );
-}
-
-function QrPopover({ url, accent }: { url: string; accent: string }) {
-  const [open, setOpen] = useState(false);
-  const svg = useMemo(() => renderSVG(url, { ecc: "M", border: 1 }), [url]);
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5"
-        style={{
-          borderRadius: "var(--radius)",
-          borderWidth: "var(--border-width)",
-          borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
-          color: "var(--muted)",
-          background: "var(--surface)",
-        }}
-      >
-        <QrCode className="h-3.5 w-3.5" />
-        <span>QR Pass</span>
-      </button>
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm" onClick={() => setOpen(false)}>
-      <div
-        className="flex w-full max-w-xs flex-col items-center gap-4 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
-        style={{
-          borderRadius: "var(--card-radius)",
-          background: "var(--surface)",
-          color: "var(--text)",
-          borderWidth: "var(--border-width)",
-          borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-2 font-mono text-[11px] font-bold tracking-widest uppercase" style={{ color: "var(--muted)" }}>
-          <Ticket className="h-3.5 w-3.5" style={{ color: accent }} />
-          <span>SCAN TO CONNECT</span>
-        </div>
-
-        <div
-          className="bg-white p-3.5 border shadow-sm"
-          style={{
-            borderRadius: "var(--radius)",
-            borderColor: "color-mix(in srgb, var(--text) 10%, transparent)",
-          }}
-        >
-          <div className="h-44 w-44" dangerouslySetInnerHTML={{ __html: svg }} />
-        </div>
-
-        <p className="max-w-full truncate font-mono text-xs opacity-75" style={{ color: "var(--muted)" }}>
-          {url}
-        </p>
-
-        <div className="flex w-full gap-2">
-          <a
-            href={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
-            download="qr-pass.svg"
-            className="flex-1 py-2 text-center text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90"
-            style={{ background: accent, borderRadius: "var(--radius)" }}
-          >
-            Download SVG
-          </a>
-          <button
-            onClick={() => setOpen(false)}
-            className="border px-4 py-2 text-xs font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            style={{
-              borderRadius: "var(--radius)",
-              borderWidth: "var(--border-width)",
-              borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
-              color: "var(--muted)",
-            }}
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MobileShareFooter({ accent }: { accent: string }) {
-  const [copied, setCopied] = useState(false);
-  const url = typeof window !== "undefined" ? window.location.origin : "";
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const shareUrl = encodeURIComponent(url);
-
-  return (
-    <footer className="mt-10 flex flex-col items-center gap-4">
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <button
-          onClick={copy}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5"
-          style={{
-            borderRadius: "var(--radius)",
-            borderWidth: "var(--border-width)",
-            borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
-            color: "var(--muted)",
-            background: "var(--surface)",
-          }}
-        >
-          {copied ? <span className="text-emerald-500 font-bold">Copied!</span> : <>
-            <Copy className="h-3.5 w-3.5" />
-            <span>Copy link</span>
-          </>}
-        </button>
-
-        <QrPopover url={url} accent={accent} />
-
-        <a
-          href={`https://x.com/intent/post?url=${shareUrl}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5 border"
-          style={{
-            borderRadius: "var(--radius)",
-            borderWidth: "var(--border-width)",
-            borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
-            color: "var(--muted)",
-            background: "var(--surface)",
-          }}
-        >
-          Post on X
-        </a>
-
-        <a
-          href={`https://wa.me/?text=${shareUrl}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5 border"
-          style={{
-            borderRadius: "var(--radius)",
-            borderWidth: "var(--border-width)",
-            borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
-            color: "var(--muted)",
-            background: "var(--surface)",
-          }}
-        >
-          WhatsApp
-        </a>
-      </div>
-
-      <div className="flex items-center gap-1.5 font-mono text-[10px] tracking-widest uppercase opacity-40" style={{ color: "var(--muted)" }}>
-        <span>POWERED BY</span>
-        <span className="font-black text-[var(--text)]">LINK</span>
-      </div>
-    </footer>
   );
 }
 
