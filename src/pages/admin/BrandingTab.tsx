@@ -523,7 +523,7 @@ export default function BrandingTab() {
           <CardContent>
             <div className="flex items-center gap-4">
               <div
-                className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl text-xl font-bold text-white shadow-sm"
+                className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white shadow-sm"
                 style={{ background: draftTheme.palette.accent }}
               >
                 {avatarPreview ? (

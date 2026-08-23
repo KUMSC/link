@@ -160,40 +160,18 @@ function Avatar({
 }) {
   const dim = size === "large" ? "h-24 w-24 sm:h-28 sm:w-28" : "h-20 w-20 sm:h-24 sm:w-24";
   return (
-    <div className="relative flex items-center justify-center">
+    <div className="relative flex items-center justify-center shrink-0">
       {hasAvatar ? (
-        <div className="relative">
-          <img
-            src={`/api/avatar?v=${version || 1}`}
-            alt={name}
-            className={`relative ${dim} object-cover`}
-            style={{
-              borderRadius: "var(--card-radius)",
-              borderWidth: "var(--border-width)",
-              borderColor: "color-mix(in srgb, var(--text) 20%, transparent)",
-              boxShadow: "var(--card-shadow)",
-            }}
-          />
-          <div
-            className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-white shadow-sm"
-            style={{
-              background: accent,
-              border: "2px solid var(--surface)",
-            }}
-            title="Verified"
-          >
-            <span className="text-[9px] font-bold">✓</span>
-          </div>
-        </div>
+        <img
+          src={`/api/avatar?v=${version || 1}`}
+          alt={name}
+          className={`${dim} rounded-full object-cover shadow-sm`}
+        />
       ) : (
         <div
-          className={`relative flex ${dim} items-center justify-center text-2xl sm:text-3xl font-black tracking-tight text-white`}
+          className={`${dim} rounded-full flex items-center justify-center text-2xl sm:text-3xl font-black tracking-tight text-white shadow-sm`}
           style={{
             background: accent,
-            borderRadius: "var(--card-radius)",
-            borderWidth: "var(--border-width)",
-            borderColor: "color-mix(in srgb, var(--text) 20%, transparent)",
-            boxShadow: "var(--card-shadow)",
             fontFamily: "var(--font-heading)",
           }}
           aria-hidden
