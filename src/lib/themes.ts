@@ -1,26 +1,46 @@
-import type { Theme, ThemePalette } from "./types";
+import type { BorderWidth, RadiusPreset, ShadowPreset, Theme, ThemePalette } from "./types";
 
 export interface ThemePreset {
   id: string;
   name: string;
+  description: string;
   /** preview swatches for the picker */
   swatches: string[];
+  defaults: {
+    fontHeading: string;
+    fontBody: string;
+    radius: RadiusPreset;
+    shadow: ShadowPreset;
+    borderWidth: BorderWidth;
+  };
   palettes: {
     light: ThemePalette;
     dark: ThemePalette;
   };
 }
 
-export const FONT_CHOICES = [
+export const HEADING_FONT_CHOICES = [
+  { name: "Space Grotesk", family: "'Space Grotesk', system-ui, sans-serif" },
+  { name: "Syne", family: "'Syne', system-ui, sans-serif" },
+  { name: "Playfair Display", family: "'Playfair Display', Georgia, serif" },
+  { name: "Plus Jakarta Sans", family: "'Plus Jakarta Sans', system-ui, sans-serif" },
   { name: "Inter", family: "'Inter', system-ui, sans-serif" },
   { name: "Poppins", family: "'Poppins', system-ui, sans-serif" },
-  { name: "DM Sans", family: "'DM Sans', system-ui, sans-serif" },
-  { name: "Space Grotesk", family: "'Space Grotesk', system-ui, sans-serif" },
   { name: "Sora", family: "'Sora', system-ui, sans-serif" },
-  { name: "Playfair Display", family: "'Playfair Display', Georgia, serif" },
-  { name: "Merriweather", family: "'Merriweather', Georgia, serif" },
   { name: "JetBrains Mono", family: "'JetBrains Mono', monospace" },
+  { name: "Merriweather", family: "'Merriweather', Georgia, serif" },
 ] as const;
+
+export const BODY_FONT_CHOICES = [
+  { name: "Inter", family: "'Inter', system-ui, sans-serif" },
+  { name: "DM Sans", family: "'DM Sans', system-ui, sans-serif" },
+  { name: "Plus Jakarta Sans", family: "'Plus Jakarta Sans', system-ui, sans-serif" },
+  { name: "Poppins", family: "'Poppins', system-ui, sans-serif" },
+  { name: "JetBrains Mono", family: "'JetBrains Mono', monospace" },
+  { name: "Merriweather", family: "'Merriweather', Georgia, serif" },
+] as const;
+
+export const FONT_CHOICES = HEADING_FONT_CHOICES;
 
 /** Google Fonts CSS URL for a family name. */
 export function googleFontUrl(fontName: string): string {
@@ -30,66 +50,139 @@ export function googleFontUrl(fontName: string): string {
 
 export const THEME_PRESETS: ThemePreset[] = [
   {
-    id: "minimal",
-    name: "Minimal",
-    swatches: ["#ffffff", "#18181b", "#6366f1"],
+    id: "swiss",
+    name: "Swiss International",
+    description: "Architectural, stark contrast, clean red accent, crisp grid.",
+    swatches: ["#f8f9fa", "#09090b", "#e11d48"],
+    defaults: {
+      fontHeading: "Space Grotesk",
+      fontBody: "Inter",
+      radius: "sm",
+      shadow: "none",
+      borderWidth: "thin",
+    },
     palettes: {
-      light: { accent: "#6366f1", surface: "#ffffff", text: "#18181b", muted: "#71717a" },
-      dark: { accent: "#818cf8", surface: "#0a0a0a", text: "#fafafa", muted: "#a1a1aa" },
+      light: { accent: "#e11d48", surface: "#ffffff", text: "#09090b", muted: "#71717a", pageBg: "#f8f9fa" },
+      dark: { accent: "#f43f5e", surface: "#121215", text: "#f4f4f5", muted: "#a1a1aa", pageBg: "#09090b" },
     },
   },
   {
-    id: "swiss",
-    name: "Swiss",
-    swatches: ["#fafafa", "#09090b", "#e11d48"],
+    id: "minimal",
+    name: "Nordic Minimal",
+    description: "Refined tech aesthetic, cobalt accent, smooth rounded cards.",
+    swatches: ["#f8fafc", "#0f172a", "#4f46e5"],
+    defaults: {
+      fontHeading: "Inter",
+      fontBody: "Inter",
+      radius: "lg",
+      shadow: "subtle",
+      borderWidth: "hairline",
+    },
     palettes: {
-      light: { accent: "#e11d48", surface: "#fafafa", text: "#09090b", muted: "#71717a" },
-      dark: { accent: "#f43f5e", surface: "#09090b", text: "#fafafa", muted: "#a1a1aa" },
+      light: { accent: "#4f46e5", surface: "#ffffff", text: "#0f172a", muted: "#64748b", pageBg: "#f8fafc" },
+      dark: { accent: "#6366f1", surface: "#18181f", text: "#f8fafc", muted: "#94a3b8", pageBg: "#0c0d12" },
+    },
+  },
+  {
+    id: "brutal",
+    name: "Neo-Brutalist",
+    description: "Sharp corners, heavy 2px borders, solid hard shadows, high energy.",
+    swatches: ["#f5f5f4", "#000000", "#facc15"],
+    defaults: {
+      fontHeading: "Space Grotesk",
+      fontBody: "JetBrains Mono",
+      radius: "none",
+      shadow: "hard",
+      borderWidth: "thick",
+    },
+    palettes: {
+      light: { accent: "#000000", surface: "#ffffff", text: "#000000", muted: "#525252", pageBg: "#f5f5f4" },
+      dark: { accent: "#facc15", surface: "#1c1917", text: "#fafaf9", muted: "#a8a29e", pageBg: "#0c0a09" },
+    },
+  },
+  {
+    id: "editorial",
+    name: "Editorial Club",
+    description: "Serif typography, warm cream paper tones, cultural aesthetic.",
+    swatches: ["#f5f2eb", "#1c1917", "#854d0e"],
+    defaults: {
+      fontHeading: "Playfair Display",
+      fontBody: "DM Sans",
+      radius: "md",
+      shadow: "subtle",
+      borderWidth: "hairline",
+    },
+    palettes: {
+      light: { accent: "#854d0e", surface: "#fcfbf9", text: "#1c1917", muted: "#78716c", pageBg: "#f5f2eb" },
+      dark: { accent: "#eab308", surface: "#1c1917", text: "#f5f5f4", muted: "#a8a29e", pageBg: "#12100e" },
     },
   },
   {
     id: "sunset",
-    name: "Sunset",
-    swatches: ["#fff7ed", "#7c2d12", "#f97316"],
+    name: "Solar Sunset",
+    description: "Warm amber and terracotta, smooth pill corners, high readability.",
+    swatches: ["#fff7ed", "#431407", "#ea580c"],
+    defaults: {
+      fontHeading: "Sora",
+      fontBody: "Plus Jakarta Sans",
+      radius: "lg",
+      shadow: "subtle",
+      borderWidth: "thin",
+    },
     palettes: {
-      light: { accent: "#f97316", surface: "#fff7ed", text: "#431407", muted: "#9a3412" },
-      dark: { accent: "#fb923c", surface: "#1c0a02", text: "#ffedd5", muted: "#fdba74" },
+      light: { accent: "#ea580c", surface: "#ffffff", text: "#431407", muted: "#9a3412", pageBg: "#fff7ed" },
+      dark: { accent: "#f97316", surface: "#1c120c", text: "#ffedd5", muted: "#fdba74", pageBg: "#0c0704" },
     },
   },
   {
     id: "ocean",
-    name: "Ocean",
-    swatches: ["#ecfeff", "#164e63", "#06b6d4"],
+    name: "Deep Pacific",
+    description: "Electric cyan and marine tones, super-rounded pill contours.",
+    swatches: ["#f0f9ff", "#082f49", "#0284c7"],
+    defaults: {
+      fontHeading: "Plus Jakarta Sans",
+      fontBody: "Inter",
+      radius: "full",
+      shadow: "subtle",
+      borderWidth: "hairline",
+    },
     palettes: {
-      light: { accent: "#06b6d4", surface: "#ecfeff", text: "#083344", muted: "#0e7490" },
-      dark: { accent: "#22d3ee", surface: "#04222b", text: "#cffafe", muted: "#67e8f9" },
+      light: { accent: "#0284c7", surface: "#ffffff", text: "#082f49", muted: "#0369a1", pageBg: "#f0f9ff" },
+      dark: { accent: "#38bdf8", surface: "#0a1926", text: "#f0f9ff", muted: "#7dd3fc", pageBg: "#030e17" },
     },
   },
   {
     id: "forest",
-    name: "Forest",
-    swatches: ["#f0fdf4", "#14532d", "#22c55e"],
-    palettes: {
-      light: { accent: "#22c55e", surface: "#f0fdf4", text: "#052e16", muted: "#166534" },
-      dark: { accent: "#4ade80", surface: "#062814", text: "#dcfce7", muted: "#86efac" },
+    name: "Botanic Forest",
+    description: "Deep pine and vivid emerald, natural organic balance.",
+    swatches: ["#f0fdf4", "#052e16", "#16a34a"],
+    defaults: {
+      fontHeading: "Poppins",
+      fontBody: "DM Sans",
+      radius: "md",
+      shadow: "subtle",
+      borderWidth: "thin",
     },
-  },
-  {
-    id: "royal",
-    name: "Royal",
-    swatches: ["#faf5ff", "#3b0764", "#a855f7"],
     palettes: {
-      light: { accent: "#a855f7", surface: "#faf5ff", text: "#3b0764", muted: "#7e22ce" },
-      dark: { accent: "#c084fc", surface: "#20063a", text: "#f5f3ff", muted: "#d8b4fe" },
+      light: { accent: "#16a34a", surface: "#ffffff", text: "#052e16", muted: "#15803d", pageBg: "#f0fdf4" },
+      dark: { accent: "#4ade80", surface: "#0a2313", text: "#f0fdf4", muted: "#86efac", pageBg: "#04140a" },
     },
   },
   {
     id: "ink",
-    name: "Ink",
-    swatches: ["#fafafa", "#111827", "#111827"],
+    name: "Obsidian Ink",
+    description: "Monochrome precision, stark grayscale, developer-first monospace.",
+    swatches: ["#f4f4f5", "#09090b", "#09090b"],
+    defaults: {
+      fontHeading: "JetBrains Mono",
+      fontBody: "Inter",
+      radius: "sm",
+      shadow: "none",
+      borderWidth: "thin",
+    },
     palettes: {
-      light: { accent: "#111827", surface: "#ffffff", text: "#111827", muted: "#6b7280" },
-      dark: { accent: "#f9fafb", surface: "#030712", text: "#f9fafb", muted: "#9ca3af" },
+      light: { accent: "#09090b", surface: "#ffffff", text: "#09090b", muted: "#52525b", pageBg: "#f4f4f5" },
+      dark: { accent: "#fafafa", surface: "#141416", text: "#fafafa", muted: "#a1a1aa", pageBg: "#09090b" },
     },
   },
 ];
@@ -104,12 +197,22 @@ export function themeFromPreset(id: string, mode: Theme["mode"], overrides?: Par
   const palette = preset.palettes[mode === "system" ? "light" : mode];
   return {
     preset: preset.id,
-    fontFamily: overrides?.fontFamily ?? "Inter",
+    fontHeading: overrides?.fontHeading ?? preset.defaults.fontHeading,
+    fontBody: overrides?.fontBody ?? preset.defaults.fontBody,
+    radius: overrides?.radius ?? preset.defaults.radius,
+    shadow: overrides?.shadow ?? preset.defaults.shadow,
+    borderWidth: overrides?.borderWidth ?? preset.defaults.borderWidth,
     mode,
     palette: overrides?.palette ?? palette,
   };
 }
 
-export function fontCssVar(theme: Theme): string {
-  return FONT_CHOICES.find((f) => f.name === theme.fontFamily)?.family ?? FONT_CHOICES[0]!.family;
+export function fontHeadingCssVar(theme: Theme): string {
+  const name = theme.fontHeading || theme.fontFamily || "Space Grotesk";
+  return HEADING_FONT_CHOICES.find((f) => f.name === name)?.family ?? HEADING_FONT_CHOICES[0]!.family;
+}
+
+export function fontBodyCssVar(theme: Theme): string {
+  const name = theme.fontBody || theme.fontFamily || "Inter";
+  return BODY_FONT_CHOICES.find((f) => f.name === name)?.family ?? BODY_FONT_CHOICES[0]!.family;
 }

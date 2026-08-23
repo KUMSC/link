@@ -17,42 +17,67 @@ export interface Social {
   url: string;
 }
 
-export type ThemeMode = "light" | "dark" | "system";
+export type RadiusPreset = "none" | "sm" | "md" | "lg" | "full";
+export type ShadowPreset = "none" | "subtle" | "hard" | "elevated";
+export type BorderWidth = "hairline" | "thin" | "medium" | "thick";
 
 export interface ThemePalette {
   accent: string;
   surface: string;
   text: string;
   muted: string;
+  pageBg?: string;
 }
 
 export interface Theme {
   preset: string;
-  fontFamily: string;
+  fontFamily?: string;
+  fontHeading: string;
+  fontBody: string;
+  radius: RadiusPreset;
+  shadow: ShadowPreset;
+  borderWidth: BorderWidth;
   mode: ThemeMode;
   palette: ThemePalette;
 }
 
 export const DEFAULT_THEME: Theme = {
-  preset: "minimal",
-  fontFamily: "Inter",
+  preset: "swiss",
+  fontHeading: "Space Grotesk",
+  fontBody: "Inter",
+  radius: "sm",
+  shadow: "subtle",
+  borderWidth: "thin",
   mode: "light",
-  palette: { accent: "#6366f1", surface: "#ffffff", text: "#18181b", muted: "#71717a" },
+  palette: {
+    accent: "#e11d48",
+    surface: "#ffffff",
+    text: "#09090b",
+    muted: "#71717a",
+    pageBg: "#f8f9fa",
+  },
 };
 
 export function parseTheme(raw: string | null | undefined): Theme {
   if (!raw) return DEFAULT_THEME;
   try {
-    const t = JSON.parse(raw) as Partial<Theme>;
+    const t = JSON.parse(raw) as Partial<Theme> & { fontFamily?: string };
+    const fontHeading = t.fontHeading || t.fontFamily || DEFAULT_THEME.fontHeading;
+    const fontBody = t.fontBody || t.fontFamily || DEFAULT_THEME.fontBody;
     return {
       preset: t.preset ?? DEFAULT_THEME.preset,
-      fontFamily: t.fontFamily ?? DEFAULT_THEME.fontFamily,
+      fontHeading,
+      fontBody,
+      radius: t.radius ?? DEFAULT_THEME.radius,
+      shadow: t.shadow ?? DEFAULT_THEME.shadow,
+      borderWidth: t.borderWidth ?? DEFAULT_THEME.borderWidth,
       mode: t.mode ?? DEFAULT_THEME.mode,
       palette: {
         accent: t.palette?.accent ?? DEFAULT_THEME.palette.accent,
         surface: t.palette?.surface ?? DEFAULT_THEME.palette.surface,
         text: t.palette?.text ?? DEFAULT_THEME.palette.text,
         muted: t.palette?.muted ?? DEFAULT_THEME.palette.muted,
+        pageBg: t.palette?.pageBg,
       },
     };
   } catch {

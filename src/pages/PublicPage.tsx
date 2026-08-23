@@ -4,18 +4,16 @@ import type { CSSProperties } from "react";
 import {
   ArrowUpRight,
   Calendar,
-  Clock,
   Copy,
-  ImageIcon,
   MapPin,
   QrCode,
-  Share2,
   Sparkles,
   Ticket,
 } from "lucide-react";
 import { renderSVG } from "uqr";
 import { getPublic } from "../lib/api";
 import type { LinkItem, Profile } from "../lib/types";
+import { PLATFORM_LABELS } from "../lib/platforms";
 import { PlatformIcon } from "../lib/icons";
 import { LinkIconBadge } from "../lib/link-icon";
 import { ThemeProvider, useTheme } from "../lib/ThemeContext";
@@ -150,41 +148,40 @@ function Avatar({ name, accent, hasAvatar, size = "default" }: { name: string; a
   const dim = size === "large" ? "h-24 w-24 sm:h-28 sm:w-28" : "h-20 w-20 sm:h-24 sm:w-24";
   return (
     <div className="relative flex items-center justify-center">
-      {/* Swiss halo lighting */}
-      <div
-        className="absolute -inset-3 rounded-3xl opacity-35 blur-xl transition-opacity"
-        style={{ background: `radial-gradient(circle, ${accent}, transparent 70%)` }}
-        aria-hidden
-      />
       {hasAvatar ? (
         <div className="relative">
           <img
             src="/api/avatar"
             alt={name}
-            className={`relative ${dim} rounded-3xl border-2 object-cover shadow-2xl transition-transform duration-300 hover:scale-105`}
+            className={`relative ${dim} object-cover`}
             style={{
-              borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
-              boxShadow: `0 12px 36px -10px ${accent}40`,
+              borderRadius: "var(--card-radius)",
+              borderWidth: "var(--border-width)",
+              borderColor: "color-mix(in srgb, var(--text) 20%, transparent)",
+              boxShadow: "var(--card-shadow)",
             }}
           />
           <div
-            className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 text-white shadow-md"
+            className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-white shadow-sm"
             style={{
               background: accent,
-              borderColor: "var(--surface)",
+              border: "2px solid var(--surface)",
             }}
-            title="Verified Club"
+            title="Verified"
           >
             <span className="text-[9px] font-bold">✓</span>
           </div>
         </div>
       ) : (
         <div
-          className={`relative flex ${dim} items-center justify-center rounded-3xl border-2 text-2xl sm:text-3xl font-black tracking-tight text-white shadow-2xl transition-transform duration-300 hover:scale-105`}
+          className={`relative flex ${dim} items-center justify-center text-2xl sm:text-3xl font-black tracking-tight text-white`}
           style={{
-            background: `linear-gradient(135deg, ${accent}, ${accent}cc)`,
+            background: accent,
+            borderRadius: "var(--card-radius)",
+            borderWidth: "var(--border-width)",
             borderColor: "color-mix(in srgb, var(--text) 20%, transparent)",
-            boxShadow: `0 12px 36px -10px ${accent}40`,
+            boxShadow: "var(--card-shadow)",
+            fontFamily: "var(--font-heading)",
           }}
           aria-hidden
         >
@@ -198,96 +195,106 @@ function Avatar({ name, accent, hasAvatar, size = "default" }: { name: string; a
 function SocialDock({ socials, accent }: { socials: Profile["socials"]; accent: string }) {
   if (socials.length === 0) return null;
   return (
-    <div
-      className="mt-5 flex flex-wrap items-center justify-center gap-2 rounded-full border p-1.5 shadow-sm backdrop-blur-md transition-all"
-      style={{
-        borderColor: "color-mix(in srgb, var(--text) 12%, transparent)",
-        background: "color-mix(in srgb, var(--surface) 80%, transparent)",
-      }}
-    >
-      {socials.map((s) => (
-        <a
-          key={s.platform}
-          href={s.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={s.platform}
-          title={s.platform}
-          className="group relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 hover:text-white hover:shadow-md"
-          style={{
-            borderColor: "color-mix(in srgb, var(--text) 10%, transparent)",
-            color: "var(--muted)",
-            background: "var(--surface)",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = accent;
-            (e.currentTarget as HTMLElement).style.borderColor = accent;
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "var(--surface)";
-            (e.currentTarget as HTMLElement).style.borderColor = "color-mix(in srgb, var(--text) 10%, transparent)";
-          }}
-        >
-          <PlatformIcon platform={s.platform} size={17} />
-        </a>
-      ))}
+    <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+      {socials.map((s) => {
+        const label = PLATFORM_LABELS[s.platform] ?? s.platform;
+        return (
+          <a
+            key={s.platform}
+            href={s.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={label}
+            title={label}
+            className="group flex h-10 w-10 items-center justify-center transition-all duration-150 hover:-translate-y-0.5"
+            style={{
+              borderRadius: "var(--radius)",
+              borderWidth: "var(--border-width)",
+              borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+              background: "var(--surface)",
+              color: "var(--text)",
+              boxShadow: "var(--card-shadow)",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.borderColor = accent;
+              (e.currentTarget as HTMLElement).style.color = accent;
+              (e.currentTarget as HTMLElement).style.background = `color-mix(in srgb, ${accent} 10%, var(--surface))`;
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.borderColor = "color-mix(in srgb, var(--text) 16%, transparent)";
+              (e.currentTarget as HTMLElement).style.color = "var(--text)";
+              (e.currentTarget as HTMLElement).style.background = "var(--surface)";
+            }}
+          >
+            <PlatformIcon platform={s.platform} size={18} />
+          </a>
+        );
+      })}
     </div>
   );
 }
 
-/** Swiss Physical Event Ticket Pass */
+/** Physical Event Ticket Pass (Clean Solid Aesthetics) */
 function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
   const dateInfo = getEventDateDetails(link.startsAt ?? null, link.endsAt ?? null);
 
   return (
     <a
       href={`/api/click/${link.id}`}
-      className="group relative flex w-full flex-col overflow-hidden rounded-2xl border text-left shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+      className="group relative flex w-full flex-col overflow-hidden text-left transition-all duration-200 hover:-translate-y-0.5"
       style={{
         background: "var(--surface)",
-        borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+        borderRadius: "var(--card-radius)",
+        borderWidth: "var(--border-width)",
+        borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
+        boxShadow: "var(--card-shadow)",
       }}
     >
       {/* Top Banner / Event Poster Header */}
-      <div className="relative h-40 sm:h-44 w-full overflow-hidden bg-black/5 dark:bg-white/5">
+      <div className="relative h-40 sm:h-44 w-full overflow-hidden bg-muted/40">
         {link.thumbnailKey ? (
           <>
             <img
               src={`/api/thumb/${link.id}`}
               alt=""
-              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
             />
-            {/* Contrast scrim gradient */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
+            <div className="absolute inset-0 bg-black/35" />
           </>
         ) : (
           <div
             className="relative flex h-full w-full items-center justify-center overflow-hidden"
-            style={{
-              background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 25%, transparent), color-mix(in srgb, ${accent} 8%, transparent)), radial-gradient(circle at 80% 20%, ${accent}33, transparent 65%)`,
-            }}
+            style={{ background: "color-mix(in srgb, var(--text) 6%, var(--surface))" }}
           >
-            <div
-              className="absolute inset-0 opacity-10"
-              style={{
-                backgroundImage: "repeating-linear-gradient(45deg, var(--text) 0, var(--text) 1px, transparent 0, transparent 16px)",
-              }}
-            />
-            <Ticket className="h-16 w-16 opacity-20 transition-transform duration-500 group-hover:scale-110" style={{ color: accent }} />
+            <Ticket className="h-16 w-16 opacity-15" style={{ color: "var(--text)" }} />
           </div>
         )}
 
-        {/* Floating Swiss Badges */}
+        {/* Floating Solid Badges */}
         <div className="absolute inset-x-3.5 top-3.5 flex items-start justify-between gap-2">
           {dateInfo && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-white/20 bg-black/80 px-2.5 py-1 text-white shadow-lg backdrop-blur-md">
+            <div
+              className="flex flex-col items-center justify-center px-2.5 py-1 text-white shadow-sm"
+              style={{
+                background: "#09090b",
+                borderRadius: "var(--radius)",
+                border: "1px solid rgba(255,255,255,0.2)",
+              }}
+            >
               <span className="font-mono text-[9px] font-bold tracking-widest uppercase opacity-75">{dateInfo.month}</span>
               <span className="text-base font-black leading-none tracking-tight">{dateInfo.day}</span>
             </div>
           )}
 
           {dateInfo && (
-            <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/80 px-2.5 py-1 text-xs font-semibold text-white shadow-lg backdrop-blur-md">
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white shadow-sm"
+              style={{
+                background: "#09090b",
+                borderRadius: "var(--radius)",
+                border: "1px solid rgba(255,255,255,0.2)",
+              }}
+            >
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
@@ -312,7 +319,7 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
 
         <h3
           className="mt-1.5 text-base font-bold tracking-tight transition-colors line-clamp-2"
-          style={{ color: "var(--text)" }}
+          style={{ color: "var(--text)", fontFamily: "var(--font-heading)" }}
         >
           {link.label}
         </h3>
@@ -339,70 +346,69 @@ function EventTicketCard({ link, accent }: { link: LinkItem; accent: string }) {
           className="absolute -left-2.5 h-5 w-5 rounded-full border shadow-inner"
           style={{
             background: "var(--page-bg)",
-            borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+            borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
           }}
         />
         <div
           className="mx-5 w-full border-t border-dashed"
-          style={{ borderColor: "color-mix(in srgb, var(--text) 18%, transparent)" }}
+          style={{ borderColor: "color-mix(in srgb, var(--text) 20%, transparent)" }}
         />
         <div
           className="absolute -right-2.5 h-5 w-5 rounded-full border shadow-inner"
           style={{
             background: "var(--page-bg)",
-            borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+            borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
           }}
         />
       </div>
 
-      {/* Ticket Stub Action Footer */}
+      {/* Ticket Action Footer */}
       <div className="flex items-center justify-between px-5 pb-4 pt-1">
         <div
-          className="flex items-center gap-2 select-none opacity-40 font-mono text-[9px] tracking-wider uppercase"
-          style={{ color: "var(--text)" }}
+          className="flex items-center gap-2 font-mono text-[11px] font-semibold tracking-wider uppercase opacity-75"
+          style={{ color: "var(--muted)" }}
         >
-          <div className="flex h-5 items-center gap-[2px]" aria-hidden>
-            <span className="h-full w-[2px] rounded-full bg-current" />
-            <span className="h-3 w-[1px] rounded-full bg-current" />
-            <span className="h-full w-[3px] rounded-full bg-current" />
-            <span className="h-4 w-[1px] rounded-full bg-current" />
-            <span className="h-full w-[2px] rounded-full bg-current" />
-            <span className="h-2 w-[1px] rounded-full bg-current" />
-            <span className="h-full w-[2px] rounded-full bg-current" />
-          </div>
-          <span className="hidden sm:inline">ADMIT ONE</span>
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: accent }} />
+          <span>{dateInfo?.isLive ? "LIVE NOW" : dateInfo?.isPast ? "CONCLUDED" : "RSVP OPEN"}</span>
         </div>
 
         <div
-          className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all duration-200 group-hover:scale-[1.03] group-hover:shadow-md"
-          style={{ background: `linear-gradient(135deg, ${accent}, ${accent}dd)` }}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all duration-150 group-hover:opacity-90"
+          style={{
+            background: accent,
+            borderRadius: "var(--radius)",
+          }}
         >
-          <span>Get Pass / RSVP</span>
-          <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          <span>View Event / RSVP</span>
+          <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </div>
       </div>
     </a>
   );
 }
 
-/** Featured Spotlight Link Card */
+/** Featured Spotlight Link Card (Solid Crisp Accent) */
 function FeaturedLinkCard({ link, accent }: { link: LinkItem; accent: string }) {
   const domain = getDomain(link.url);
 
   return (
     <a
       href={`/api/click/${link.id}`}
-      className="group relative flex w-full flex-col overflow-hidden rounded-2xl p-5 text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+      className="group relative flex w-full flex-col overflow-hidden p-5 text-white transition-all duration-150 hover:-translate-y-0.5"
       style={{
-        background: `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 85%, black))`,
+        background: accent,
+        borderRadius: "var(--card-radius)",
+        borderWidth: "var(--border-width)",
+        borderColor: "transparent",
+        boxShadow: "var(--card-shadow)",
       }}
     >
-      <div className="flex items-center justify-between text-white/80 font-mono text-[10px] font-bold tracking-widest uppercase">
+      <div className="flex items-center justify-between text-white/85 font-mono text-[10px] font-bold tracking-widest uppercase">
         <span className="flex items-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5" />
           <span>FEATURED SPOTLIGHT</span>
         </span>
-        <ArrowUpRight className="h-4 w-4 opacity-80 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
+        <ArrowUpRight className="h-4 w-4 opacity-85 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
       </div>
 
       <div className="mt-3 flex items-center gap-3.5">
@@ -410,57 +416,68 @@ function FeaturedLinkCard({ link, accent }: { link: LinkItem; accent: string }) 
           <img
             src={`/api/thumb/${link.id}`}
             alt=""
-            className="h-12 w-12 shrink-0 rounded-xl border border-white/30 object-cover shadow-sm"
+            className="h-12 w-12 shrink-0 object-cover border border-white/30"
+            style={{ borderRadius: "var(--radius)" }}
           />
         ) : link.icon ? (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/30 bg-white/20 shadow-sm backdrop-blur-sm">
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center border border-white/30 bg-white/15"
+            style={{ borderRadius: "var(--radius)" }}
+          >
             <LinkIconBadge icon={link.icon} size={20} />
           </div>
         ) : null}
 
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-bold tracking-tight">{link.label}</h3>
-          {domain && <p className="mt-0.5 font-mono text-xs text-white/75 truncate">{domain}</p>}
+          <h3 className="truncate text-base font-bold tracking-tight" style={{ fontFamily: "var(--font-heading)" }}>
+            {link.label}
+          </h3>
+          {domain && <p className="mt-0.5 font-mono text-xs text-white/80 truncate">{domain}</p>}
         </div>
       </div>
     </a>
   );
 }
 
-/** Standard Swiss Precision Link Card */
+/** Standard Solid / Bordered Link Card */
 function StandardLinkCard({ link, accent }: { link: LinkItem; accent: string }) {
   const domain = getDomain(link.url);
 
   return (
     <a
       href={`/api/click/${link.id}`}
-      className="group relative flex w-full items-center gap-3.5 rounded-2xl border px-4 py-3.5 text-left shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      className="group relative flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-all duration-150 hover:-translate-y-0.5"
       style={{
-        borderColor: "color-mix(in srgb, var(--text) 14%, transparent)",
+        borderRadius: "var(--card-radius)",
+        borderWidth: "var(--border-width)",
+        borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
         color: "var(--text)",
         background: "var(--surface)",
+        boxShadow: "var(--card-shadow)",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.borderColor = `color-mix(in srgb, ${accent} 60%, transparent)`;
-        (e.currentTarget as HTMLElement).style.boxShadow = `0 10px 30px -10px ${accent}30`;
+        (e.currentTarget as HTMLElement).style.borderColor = accent;
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.borderColor = "color-mix(in srgb, var(--text) 14%, transparent)";
-        (e.currentTarget as HTMLElement).style.boxShadow = "";
+        (e.currentTarget as HTMLElement).style.borderColor = "color-mix(in srgb, var(--text) 16%, transparent)";
       }}
     >
       {link.thumbnailKey ? (
         <img
           src={`/api/thumb/${link.id}`}
           alt=""
-          className="h-11 w-11 shrink-0 rounded-xl border object-cover shadow-sm"
-          style={{ borderColor: "color-mix(in srgb, var(--text) 12%, transparent)" }}
+          className="h-11 w-11 shrink-0 object-cover border"
+          style={{
+            borderRadius: "var(--radius)",
+            borderColor: "color-mix(in srgb, var(--text) 12%, transparent)",
+          }}
         />
       ) : link.icon ? (
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-colors group-hover:scale-105"
+          className="flex h-10 w-10 shrink-0 items-center justify-center border transition-colors"
           style={{
-            background: `color-mix(in srgb, ${accent} 12%, transparent)`,
+            borderRadius: "var(--radius)",
+            background: `color-mix(in srgb, ${accent} 10%, transparent)`,
             borderColor: `color-mix(in srgb, ${accent} 25%, transparent)`,
             color: accent,
           }}
@@ -470,7 +487,9 @@ function StandardLinkCard({ link, accent }: { link: LinkItem; accent: string }) 
       ) : null}
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold tracking-tight">{link.label}</p>
+        <p className="truncate text-[15px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-heading)" }}>
+          {link.label}
+        </p>
         {domain && (
           <p className="font-mono text-xs tracking-tight truncate" style={{ color: "var(--muted)" }}>
             {domain}
@@ -479,8 +498,9 @@ function StandardLinkCard({ link, accent }: { link: LinkItem; accent: string }) 
       </div>
 
       <div
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border opacity-50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100"
+        className="flex h-7 w-7 shrink-0 items-center justify-center border opacity-50 transition-all duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100"
         style={{
+          borderRadius: "var(--radius)",
           borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
           color: "var(--text)",
         }}
@@ -494,18 +514,24 @@ function StandardLinkCard({ link, accent }: { link: LinkItem; accent: string }) 
 function EmptyState({ accent }: { accent: string }) {
   return (
     <div
-      className="mt-6 flex w-full flex-col items-center gap-3 rounded-2xl border border-dashed px-6 py-12 text-center backdrop-blur-sm"
-      style={{ borderColor: "color-mix(in srgb, var(--text) 20%, transparent)", background: "var(--surface)" }}
+      className="mt-6 flex w-full flex-col items-center gap-3 border border-dashed px-6 py-12 text-center"
+      style={{
+        borderRadius: "var(--card-radius)",
+        borderColor: "color-mix(in srgb, var(--text) 20%, transparent)",
+        background: "var(--surface)",
+      }}
     >
       <Ticket className="h-8 w-8 opacity-30" style={{ color: accent }} />
-      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>This page is under construction.</p>
+      <p className="text-sm font-semibold" style={{ color: "var(--text)", fontFamily: "var(--font-heading)" }}>
+        This page is under construction.
+      </p>
       <p className="text-xs max-w-xs" style={{ color: "var(--muted)" }}>
         Configure your links, upcoming events, and socials in the admin portal.
       </p>
       <a
         href="/admin"
-        className="mt-2 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm transition-transform hover:scale-105"
-        style={{ background: accent }}
+        className="mt-2 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-transform hover:opacity-90"
+        style={{ background: accent, borderRadius: "var(--radius)" }}
       >
         Open Admin Portal
       </a>
@@ -532,10 +558,13 @@ function DesktopQrBox({ url, accent }: { url: string; accent: string }) {
 
   return (
     <div
-      className="mt-6 hidden md:flex w-full flex-col items-center gap-3.5 rounded-2xl border p-4 shadow-sm backdrop-blur-md"
+      className="mt-6 hidden md:flex w-full flex-col items-center gap-3.5 p-4 shadow-sm"
       style={{
         background: "var(--surface)",
-        borderColor: "color-mix(in srgb, var(--text) 12%, transparent)",
+        borderRadius: "var(--card-radius)",
+        borderWidth: "var(--border-width)",
+        borderColor: "color-mix(in srgb, var(--text) 14%, transparent)",
+        boxShadow: "var(--card-shadow)",
       }}
     >
       <div className="flex w-full items-center justify-between font-mono text-[10px] font-bold tracking-widest uppercase opacity-70" style={{ color: "var(--muted)" }}>
@@ -543,21 +572,28 @@ function DesktopQrBox({ url, accent }: { url: string; accent: string }) {
           <QrCode className="h-3.5 w-3.5" style={{ color: accent }} />
           <span>SCAN ON MOBILE</span>
         </span>
-        <span>// SHARE</span>
+        <span>// CONNECT</span>
       </div>
 
       <div className="flex items-center gap-4 w-full">
-        {/* QR Code */}
-        <div className="rounded-xl border bg-white p-2 shadow-sm shrink-0" style={{ borderColor: "color-mix(in srgb, var(--text) 10%, transparent)" }}>
+        <div
+          className="bg-white p-2 shrink-0 border"
+          style={{
+            borderRadius: "var(--radius)",
+            borderColor: "color-mix(in srgb, var(--text) 12%, transparent)",
+          }}
+        >
           <div className="h-20 w-20" dangerouslySetInnerHTML={{ __html: svg }} />
         </div>
 
         <div className="flex flex-1 flex-col gap-2 min-w-0">
           <button
             onClick={copy}
-            className="flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all hover:opacity-85"
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all hover:opacity-85"
             style={{
-              borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
+              borderRadius: "var(--radius)",
+              borderWidth: "var(--border-width)",
+              borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
               color: "var(--text)",
             }}
           >
@@ -572,8 +608,12 @@ function DesktopQrBox({ url, accent }: { url: string; accent: string }) {
               href={`https://x.com/intent/post?url=${shareUrl}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 rounded-xl border py-1.5 text-center text-[11px] font-semibold transition-opacity hover:opacity-80"
-              style={{ borderColor: "color-mix(in srgb, var(--text) 15%, transparent)", color: "var(--muted)" }}
+              className="flex-1 py-1.5 text-center text-[11px] font-semibold transition-opacity hover:opacity-80 border"
+              style={{
+                borderRadius: "var(--radius)",
+                borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
+                color: "var(--muted)",
+              }}
             >
               X
             </a>
@@ -581,8 +621,12 @@ function DesktopQrBox({ url, accent }: { url: string; accent: string }) {
               href={`https://wa.me/?text=${shareUrl}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 rounded-xl border py-1.5 text-center text-[11px] font-semibold transition-opacity hover:opacity-80"
-              style={{ borderColor: "color-mix(in srgb, var(--text) 15%, transparent)", color: "var(--muted)" }}
+              className="flex-1 py-1.5 text-center text-[11px] font-semibold transition-opacity hover:opacity-80 border"
+              style={{
+                borderRadius: "var(--radius)",
+                borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
+                color: "var(--muted)",
+              }}
             >
               WhatsApp
             </a>
@@ -605,34 +649,38 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
   const configured = !!(profile.orgName || links.length > 0 || profile.socials.length > 0);
   const url = typeof window !== "undefined" ? window.location.origin : "";
 
-  // Swiss High-Craft Background: Dot Matrix Grid + Ambient Spotlight Mesh
+  // Clean, high-precision canvas background (NO color gradients)
   const bg = {
     ...cssVars,
     backgroundColor: "var(--page-bg)",
-    backgroundImage: `
-      radial-gradient(1100px 520px at 50% -10%, color-mix(in srgb, ${accent} 20%, transparent), transparent 65%),
-      radial-gradient(800px 400px at 85% 100%, color-mix(in srgb, ${accent} 10%, transparent), transparent 60%),
-      radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 6%, transparent) 1px, transparent 0)
-    `,
-    backgroundSize: "100% 100%, 100% 100%, 20px 20px",
+    backgroundImage: `radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 0)`,
+    backgroundSize: "20px 20px",
   } as CSSProperties;
 
-  // Single-column mode for embedded admin preview OR mobile layout
+  // Single-column mode for embedded admin preview
   if (embedded) {
     return (
       <main className="relative mx-auto flex w-full max-w-md flex-col items-center px-4 py-8" style={bg}>
         {/* Cover Banner (if set) */}
         {profile.bannerKey && (
-          <div className="relative mb-[-3.5rem] h-32 w-full overflow-hidden rounded-2xl border shadow-sm" style={{ borderColor: "color-mix(in srgb, var(--text) 14%, transparent)" }}>
+          <div
+            className="relative mb-[-3rem] h-28 w-full overflow-hidden border shadow-sm"
+            style={{
+              borderRadius: "var(--card-radius)",
+              borderColor: "color-mix(in srgb, var(--text) 14%, transparent)",
+            }}
+          >
             <img src="/api/banner" alt="" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
           </div>
         )}
 
         <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} />
 
         {profile.orgName && (
-          <h1 className="mt-4 text-center text-2xl font-extrabold tracking-tight" style={{ color: "var(--text)" }}>
+          <h1
+            className="mt-4 text-center text-2xl font-extrabold tracking-tight"
+            style={{ color: "var(--text)", fontFamily: "var(--font-heading)" }}
+          >
             {profile.orgName}
           </h1>
         )}
@@ -645,7 +693,7 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
 
         <SocialDock socials={profile.socials} accent={accent} />
 
-        <div className="mt-7 flex w-full flex-col gap-3.5">
+        <div className="mt-6 flex w-full flex-col gap-3.5">
           {featured.map((link) => (
             <FeaturedLinkCard key={link.id} link={link} accent={accent} />
           ))}
@@ -666,28 +714,36 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
     <div className="min-h-screen w-full" style={bg}>
       {/* Top Panoramic Banner (if available) for large screens */}
       {profile.bannerKey && (
-        <div className="relative h-44 sm:h-56 md:h-64 w-full overflow-hidden border-b" style={{ borderColor: "color-mix(in srgb, var(--text) 10%, transparent)" }}>
+        <div
+          className="relative h-44 sm:h-56 md:h-64 w-full overflow-hidden border-b"
+          style={{ borderColor: "color-mix(in srgb, var(--text) 12%, transparent)" }}
+        >
           <img src="/api/banner" alt="" className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--page-bg)] via-black/20 to-transparent" />
         </div>
       )}
 
-      <main className={`relative mx-auto w-full px-5 sm:px-8 py-10 md:py-14 ${profile.bannerKey ? "max-w-5xl -mt-16 sm:-mt-20 md:-mt-24" : "max-w-5xl"}`}>
+      <main className={`relative mx-auto w-full px-5 sm:px-8 py-10 md:py-14 ${profile.bannerKey ? "max-w-5xl -mt-14 sm:-mt-18 md:-mt-20" : "max-w-5xl"}`}>
         {/* Desktop 2-Column Studio Grid */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 items-start">
           {/* Left Column: Identity & Profile Studio Card */}
           <div className="md:col-span-5 lg:col-span-5 flex flex-col items-center md:items-start text-center md:text-left md:sticky md:top-8">
             <div
-              className="relative flex w-full flex-col items-center md:items-start rounded-3xl border p-6 sm:p-7 shadow-sm backdrop-blur-md"
+              className="relative flex w-full flex-col items-center md:items-start p-6 sm:p-7 shadow-sm backdrop-blur-md"
               style={{
                 background: "var(--surface)",
+                borderRadius: "var(--card-radius)",
+                borderWidth: "var(--border-width)",
                 borderColor: "color-mix(in srgb, var(--text) 14%, transparent)",
+                boxShadow: "var(--card-shadow)",
               }}
             >
               <Avatar name={profile.orgName} accent={accent} hasAvatar={!!profile.avatarKey} size="large" />
 
               {profile.orgName && (
-                <h1 className="mt-5 text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--text)" }}>
+                <h1
+                  className="mt-5 text-2xl sm:text-3xl font-extrabold tracking-tight"
+                  style={{ color: "var(--text)", fontFamily: "var(--font-heading)" }}
+                >
                   {profile.orgName}
                 </h1>
               )}
@@ -700,7 +756,6 @@ export function PageShell({ data, interactive = true, embedded = false }: { data
 
               <SocialDock socials={profile.socials} accent={accent} />
 
-              {/* Desktop Direct Connect & QR Box */}
               {interactive && <DesktopQrBox url={url} accent={accent} />}
             </div>
           </div>
@@ -768,8 +823,10 @@ function QrPopover({ url, accent }: { url: string; accent: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5 hover:shadow-sm"
+        className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5"
         style={{
+          borderRadius: "var(--radius)",
+          borderWidth: "var(--border-width)",
           borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
           color: "var(--muted)",
           background: "var(--surface)",
@@ -784,10 +841,12 @@ function QrPopover({ url, accent }: { url: string; accent: string }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm" onClick={() => setOpen(false)}>
       <div
-        className="flex w-full max-w-xs flex-col items-center gap-4 rounded-3xl border p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        className="flex w-full max-w-xs flex-col items-center gap-4 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
         style={{
+          borderRadius: "var(--card-radius)",
           background: "var(--surface)",
           color: "var(--text)",
+          borderWidth: "var(--border-width)",
           borderColor: "color-mix(in srgb, var(--text) 18%, transparent)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -797,7 +856,13 @@ function QrPopover({ url, accent }: { url: string; accent: string }) {
           <span>SCAN TO CONNECT</span>
         </div>
 
-        <div className="rounded-2xl border bg-white p-3.5 shadow-md" style={{ borderColor: "color-mix(in srgb, var(--text) 10%, transparent)" }}>
+        <div
+          className="bg-white p-3.5 border shadow-sm"
+          style={{
+            borderRadius: "var(--radius)",
+            borderColor: "color-mix(in srgb, var(--text) 10%, transparent)",
+          }}
+        >
           <div className="h-44 w-44" dangerouslySetInnerHTML={{ __html: svg }} />
         </div>
 
@@ -809,15 +874,20 @@ function QrPopover({ url, accent }: { url: string; accent: string }) {
           <a
             href={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
             download="qr-pass.svg"
-            className="flex-1 rounded-xl py-2 text-center text-xs font-bold text-white shadow-sm transition-transform hover:scale-105"
-            style={{ background: accent }}
+            className="flex-1 py-2 text-center text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+            style={{ background: accent, borderRadius: "var(--radius)" }}
           >
             Download SVG
           </a>
           <button
             onClick={() => setOpen(false)}
-            className="rounded-xl border px-4 py-2 text-xs font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ borderColor: "color-mix(in srgb, var(--text) 16%, transparent)", color: "var(--muted)" }}
+            className="border px-4 py-2 text-xs font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            style={{
+              borderRadius: "var(--radius)",
+              borderWidth: "var(--border-width)",
+              borderColor: "color-mix(in srgb, var(--text) 16%, transparent)",
+              color: "var(--muted)",
+            }}
           >
             Close
           </button>
@@ -848,8 +918,10 @@ function MobileShareFooter({ accent }: { accent: string }) {
       <div className="flex flex-wrap items-center justify-center gap-2">
         <button
           onClick={copy}
-          className="flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5 hover:shadow-sm"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5"
           style={{
+            borderRadius: "var(--radius)",
+            borderWidth: "var(--border-width)",
             borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
             color: "var(--muted)",
             background: "var(--surface)",
@@ -867,8 +939,10 @@ function MobileShareFooter({ accent }: { accent: string }) {
           href={`https://x.com/intent/post?url=${shareUrl}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5 hover:shadow-sm"
+          className="px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5 border"
           style={{
+            borderRadius: "var(--radius)",
+            borderWidth: "var(--border-width)",
             borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
             color: "var(--muted)",
             background: "var(--surface)",
@@ -881,8 +955,10 @@ function MobileShareFooter({ accent }: { accent: string }) {
           href={`https://wa.me/?text=${shareUrl}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5 hover:shadow-sm"
+          className="px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition-all hover:-translate-y-0.5 border"
           style={{
+            borderRadius: "var(--radius)",
+            borderWidth: "var(--border-width)",
             borderColor: "color-mix(in srgb, var(--text) 15%, transparent)",
             color: "var(--muted)",
             background: "var(--surface)",
@@ -914,7 +990,7 @@ export default function PublicPage() {
   if (isLoading) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6">
-        <div className="h-28 w-28 animate-pulse rounded-3xl bg-muted" />
+        <div className="h-24 w-24 animate-pulse rounded-2xl bg-muted" />
         <div className="h-6 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="mt-4 h-36 w-full max-w-md animate-pulse rounded-2xl bg-muted" />
         <div className="h-14 w-full max-w-md animate-pulse rounded-2xl bg-muted" />

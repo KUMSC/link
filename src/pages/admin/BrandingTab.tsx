@@ -14,10 +14,15 @@ import {
   uploadBanner,
 } from "../../lib/api";
 import { PLATFORM_LABELS, SOCIAL_PLATFORMS, validateUrl } from "../../lib/platforms";
-import { FONT_CHOICES, THEME_PRESETS, themeFromPreset } from "../../lib/themes";
+import {
+  BODY_FONT_CHOICES,
+  HEADING_FONT_CHOICES,
+  THEME_PRESETS,
+  themeFromPreset,
+} from "../../lib/themes";
 import { ThemeProvider } from "../../lib/ThemeContext";
 import { PageShell } from "../PublicPage";
-import type { PlatformId, Theme, ThemeMode } from "../../lib/types";
+import type { BorderWidth, PlatformId, RadiusPreset, ShadowPreset, Theme, ThemeMode } from "../../lib/types";
 import { DEFAULT_THEME } from "../../lib/types";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -48,6 +53,28 @@ interface SocialRow {
 }
 
 const MODE_LABELS: Record<ThemeMode, string> = { light: "Light", dark: "Dark", system: "System" };
+
+const RADIUS_LABELS: Record<RadiusPreset, string> = {
+  none: "Sharp (0px)",
+  sm: "Subtle (6px)",
+  md: "Medium (10px)",
+  lg: "Large (16px)",
+  full: "Pill (Full)",
+};
+
+const SHADOW_LABELS: Record<ShadowPreset, string> = {
+  none: "None",
+  subtle: "Subtle",
+  hard: "Hard Drop",
+  elevated: "Elevated",
+};
+
+const BORDER_LABELS: Record<BorderWidth, string> = {
+  hairline: "Hairline",
+  thin: "Thin",
+  medium: "Medium",
+  thick: "Thick (2px)",
+};
 
 export default function BrandingTab() {
   const { data } = useQuery({ queryKey: ["admin-data"], queryFn: getAdminData });
@@ -163,8 +190,6 @@ export default function BrandingTab() {
   const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
   const hasBanner = !!(bannerPreview || data?.profile.bannerKey);
 
-  // Tracks manual palette edits: mode switching keeps custom colors instead of
-  // resetting to the preset's palette for the new mode.
   const paletteDirty = useRef(false);
 
   const updatePalette = (key: keyof Theme["palette"], value: string) => {
@@ -197,7 +222,7 @@ export default function BrandingTab() {
   };
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
       <div className="flex min-w-0 flex-col gap-6">
         {/* Profile */}
         <Card>
@@ -222,69 +247,181 @@ export default function BrandingTab() {
           </CardContent>
         </Card>
 
-        {/* Theme */}
+        {/* Theme & Design System */}
         <Card>
           <CardHeader>
-            <CardTitle>Theme</CardTitle>
+            <CardTitle>Theme & Design Language</CardTitle>
             <CardAction>
               <SavedBadge />
             </CardAction>
           </CardHeader>
           <CardContent className="flex flex-col gap-6">
+            {/* Presets */}
             <div className="grid gap-3">
-              <Label>Preset</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex items-center justify-between">
+                <Label>Style Preset</Label>
+                <span className="text-[11px] text-muted-foreground">Changes colors, fonts & shapes</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {THEME_PRESETS.map((preset) => (
                   <button
                     key={preset.id}
                     type="button"
                     onClick={() => {
                       paletteDirty.current = false;
-                      setDraftTheme((t) => ({ ...themeFromPreset(preset.id, t.mode), fontFamily: t.fontFamily }));
+                      setDraftTheme(themeFromPreset(preset.id, draftTheme.mode));
                     }}
                     className={cn(
-                      "flex flex-col gap-2 rounded-xl border p-3 text-left transition-colors hover:border-ring",
-                      draftTheme.preset === preset.id ? "border-ring ring-1 ring-ring" : "",
+                      "flex flex-col gap-2 rounded-xl border p-3 text-left transition-all hover:border-ring",
+                      draftTheme.preset === preset.id ? "border-ring ring-2 ring-ring/20 bg-muted/30" : "bg-card",
                     )}
                   >
-                    <span className="flex gap-1">
+                    <span className="flex gap-1.5 items-center">
                       {preset.swatches.map((c) => (
-                        <span key={c} className="h-4 w-4 rounded-full" style={{ background: c }} />
+                        <span key={c} className="h-3.5 w-3.5 rounded-full border border-black/10 shadow-xs" style={{ background: c }} />
                       ))}
                     </span>
-                    <span className="text-xs font-medium">{preset.name}</span>
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold block truncate">{preset.name}</span>
+                      <span className="text-[10px] text-muted-foreground block truncate leading-tight mt-0.5">{preset.defaults.fontHeading}</span>
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="grid gap-3">
-              <Label htmlFor="font">Font</Label>
-              <Select value={draftTheme.fontFamily} onValueChange={(v) => setDraftTheme((t) => ({ ...t, fontFamily: v }))}>
-                <SelectTrigger id="font">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FONT_CHOICES.map((f) => (
-                    <SelectItem key={f.name} value={f.name}>
-                      {f.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Separator />
+
+            {/* Typography Selection (Heading vs Body) */}
+            <div className="grid gap-4">
+              <Label className="text-sm font-semibold">Typography</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="fontHeading" className="text-xs text-muted-foreground">Title / Heading Font</Label>
+                  <Select
+                    value={draftTheme.fontHeading || "Space Grotesk"}
+                    onValueChange={(v) => setDraftTheme((t) => ({ ...t, fontHeading: v }))}
+                  >
+                    <SelectTrigger id="fontHeading">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HEADING_FONT_CHOICES.map((f) => (
+                        <SelectItem key={f.name} value={f.name}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="fontBody" className="text-xs text-muted-foreground">Body & Subtitle Font</Label>
+                  <Select
+                    value={draftTheme.fontBody || "Inter"}
+                    onValueChange={(v) => setDraftTheme((t) => ({ ...t, fontBody: v }))}
+                  >
+                    <SelectTrigger id="fontBody">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BODY_FONT_CHOICES.map((f) => (
+                        <SelectItem key={f.name} value={f.name}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-                        <div className="grid gap-3">
-              <Label>Mode</Label>
+            <Separator />
+
+            {/* Shape & Geometry Tokens */}
+            <div className="grid gap-4">
+              <Label className="text-sm font-semibold">Shapes & Styling</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Roundness */}
+                <div className="grid gap-2">
+                  <Label htmlFor="radius" className="text-xs text-muted-foreground">Corner Roundness</Label>
+                  <Select
+                    value={draftTheme.radius || "sm"}
+                    onValueChange={(v) => setDraftTheme((t) => ({ ...t, radius: v as RadiusPreset }))}
+                  >
+                    <SelectTrigger id="radius">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(RADIUS_LABELS) as RadiusPreset[]).map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {RADIUS_LABELS[r]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Shadow */}
+                <div className="grid gap-2">
+                  <Label htmlFor="shadow" className="text-xs text-muted-foreground">Elevation / Shadow</Label>
+                  <Select
+                    value={draftTheme.shadow || "subtle"}
+                    onValueChange={(v) => setDraftTheme((t) => ({ ...t, shadow: v as ShadowPreset }))}
+                  >
+                    <SelectTrigger id="shadow">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(SHADOW_LABELS) as ShadowPreset[]).map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {SHADOW_LABELS[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Border Width */}
+                <div className="grid gap-2">
+                  <Label htmlFor="borderWidth" className="text-xs text-muted-foreground">Border Thickness</Label>
+                  <Select
+                    value={draftTheme.borderWidth || "thin"}
+                    onValueChange={(v) => setDraftTheme((t) => ({ ...t, borderWidth: v as BorderWidth }))}
+                  >
+                    <SelectTrigger id="borderWidth">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(BORDER_LABELS) as BorderWidth[]).map((b) => (
+                        <SelectItem key={b} value={b}>
+                          {BORDER_LABELS[b]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Mode Switcher */}
+            <div className="grid gap-3">
+              <Label className="text-sm font-semibold">Appearance Mode</Label>
               <Tabs
                 value={draftTheme.mode}
                 onValueChange={(v) =>
                   setDraftTheme((t) => {
                     const mode = v as ThemeMode;
-                    // Switching mode adopts the preset's palette for that mode,
-                    // unless the user has customized colors (tracked separately).
                     if (paletteDirty.current) return { ...t, mode };
-                    return { ...themeFromPreset(t.preset, mode), fontFamily: t.fontFamily };
+                    return themeFromPreset(t.preset, mode, {
+                      fontHeading: t.fontHeading,
+                      fontBody: t.fontBody,
+                      radius: t.radius,
+                      shadow: t.shadow,
+                      borderWidth: t.borderWidth,
+                    });
                   })
                 }
               >
@@ -298,26 +435,33 @@ export default function BrandingTab() {
               </Tabs>
             </div>
 
+            {/* Solid Colors */}
             <div className="grid gap-3">
-              <Label>Colors</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <Label className="text-sm font-semibold">Solid Palette</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {(
                   [
-                    ["accent", "Accent"],
-                    ["surface", "Background"],
-                    ["text", "Text"],
-                    ["muted", "Muted"],
+                    ["accent", "Accent Color"],
+                    ["surface", "Card Surface"],
+                    ["text", "Text & Titles"],
+                    ["muted", "Muted Subtitles"],
+                    ["pageBg", "Canvas Background"],
                   ] as const
                 ).map(([key, label]) => (
-                  <div key={key} className="flex items-center gap-2">
+                  <div key={key} className="flex items-center gap-2.5 rounded-xl border p-2 bg-card">
                     <Input
                       type="color"
-                      className="h-9 w-10 cursor-pointer p-0.5"
-                      value={draftTheme.palette[key]}
+                      className="h-8 w-9 cursor-pointer p-0.5 rounded-lg border"
+                      value={draftTheme.palette[key] || (key === "pageBg" ? "#f8f9fa" : "#ffffff")}
                       onChange={(e) => updatePalette(key, e.target.value)}
                       aria-label={label}
                     />
-                    <span className="text-xs text-muted-foreground">{label}</span>
+                    <div className="min-w-0">
+                      <span className="text-xs font-medium block truncate">{label}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground block truncate uppercase">
+                        {draftTheme.palette[key] || "auto"}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -333,7 +477,7 @@ export default function BrandingTab() {
           <CardContent>
             <div className="flex items-center gap-4">
               <div
-                className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white"
+                className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl text-xl font-bold text-white shadow-sm"
                 style={{ background: draftTheme.palette.accent }}
               >
                 {avatarPreview ? (
@@ -429,7 +573,7 @@ export default function BrandingTab() {
                 </Button>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">Recommended 1200×400 or 16:9 • Shown as the top header banner</p>
+            <p className="text-[11px] text-muted-foreground">Recommended 1200×400 or 16:9 • Displayed at the top of your public page</p>
           </CardContent>
         </Card>
 
@@ -445,8 +589,8 @@ export default function BrandingTab() {
             {socials.length === 0 && <p className="text-sm text-muted-foreground">No social links yet.</p>}
             <div className="flex flex-col gap-2">
               {socials.map((s, i) => (
-                <div key={`${s.platform}-${i}`} className="flex items-center gap-2">
-                  <span className="w-28 text-sm font-medium">{PLATFORM_LABELS[s.platform]}</span>
+                <div key={i} className="flex items-center gap-2">
+                  <span className="w-24 text-xs text-muted-foreground">{PLATFORM_LABELS[s.platform]}</span>
                   <Input
                     className="flex-1 font-mono text-xs"
                     value={s.url}
@@ -501,11 +645,14 @@ export default function BrandingTab() {
         </div>
       </div>
 
-      {/* Live preview */}
-      <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
-        <div className="flex h-full flex-col overflow-hidden rounded-2xl border shadow-xl">
-          <div className="border-b bg-muted/50 px-4 py-2.5 text-xs font-medium text-muted-foreground">Live preview</div>
-          <div className="min-h-[420px] flex-1 lg:overflow-y-auto">
+      {/* Scrollable Live Preview */}
+      <div className="lg:sticky lg:top-6">
+        <div className="flex h-[84vh] max-h-[860px] min-h-[520px] flex-col overflow-hidden rounded-2xl border shadow-xl bg-background">
+          <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground">
+            <span className="font-semibold">Live Preview</span>
+            <span className="font-mono text-[10px] uppercase opacity-75">Scrollable Frame</span>
+          </div>
+          <div className="flex-1 overflow-y-auto overscroll-contain">
             <ThemeProvider theme={draftTheme}>
               <PageShell data={previewData} interactive={false} embedded />
             </ThemeProvider>
