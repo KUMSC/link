@@ -1,5 +1,6 @@
 import type { LinkItem, LinkKind, Profile, Theme } from "../src/lib/types";
 import { parseTheme } from "../src/lib/types";
+import { deriveSource } from "./util";
 
 function mapProfile(row: Record<string, unknown>): Profile {
   return {
@@ -311,6 +312,37 @@ export async function getBreakdown(
     key: r.key as string,
     count: r.count as number,
   }));
+}
+
+/**
+ * Referrer breakdown grouped by *normalized traffic source* rather than raw
+ * URL, so instagram.com/… and l.facebook.com/… roll up to "Instagram" /
+ * "Facebook", and self-referrals show as "(this page)" instead of the site's
+ * own URL. Aggregated in JS from one row per distinct referer.
+ */
+export async function getReferrerBreakdown(
+  db: D1Database,
+  days: number,
+  ownOrigin: string,
+  limit = 10,
+): Promise<{ key: string; count: number }[]> {
+  const res = await db
+    .prepare(
+      `SELECT referer AS referer, COUNT(*) AS count
+       FROM clicks WHERE clicked_at >= unixepoch() - ?
+       GROUP BY referer`,
+    )
+    .bind(days * 86400)
+    .all();
+  const merged = new Map<string, number>();
+  for (const r of res.results as Record<string, unknown>[]) {
+    const label = deriveSource(r.referer as string | null, ownOrigin);
+    merged.set(label, (merged.get(label) ?? 0) + (r.count as number));
+  }
+  return [...merged.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([key, count]) => ({ key, count }));
 }
 
 export async function getAllClicks(db: D1Database, days: number): Promise<Record<string, unknown>[]> {

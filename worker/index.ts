@@ -12,6 +12,7 @@ import {
   getLink,
   getLinks,
   getProfile,
+  getReferrerBreakdown,
   getTotalClicks,
   getTotalViews,
   getUniqueVisitors,
@@ -341,16 +342,17 @@ app.post("/api/admin/links/reorder", async (c) => {
 app.get("/api/admin/stats", async (c) => {
   const rangeParam = c.req.query("days");
   const rangeDays = rangeParam === "all" ? -1 : Number(rangeParam ?? 30) || 30;
+  const windowDays = rangeDays > 0 ? rangeDays : 30;
 
   const [totals, daily, total, views, uniques, referrers, countries, devices] = await Promise.all([
     getClickTotals(c.env.DB),
-    getDailyClicks(c.env.DB, rangeDays > 0 ? rangeDays : 30),
+    getDailyClicks(c.env.DB, windowDays),
     getTotalClicks(c.env.DB, rangeDays > 0 ? rangeDays : undefined),
     getTotalViews(c.env.DB, rangeDays > 0 ? rangeDays : undefined),
     getUniqueVisitors(c.env.DB, rangeDays > 0 ? rangeDays : undefined),
-    getBreakdown(c.env.DB, "referer", "clicks", rangeDays > 0 ? rangeDays : 3650, 10),
-    getBreakdown(c.env.DB, "country", "clicks", rangeDays > 0 ? rangeDays : 3650, 10),
-    getBreakdown(c.env.DB, "device", "clicks", rangeDays > 0 ? rangeDays : 3650, 10),
+    getReferrerBreakdown(c.env.DB, rangeDays > 0 ? rangeDays : 3650, new URL(c.req.url).origin, 10),
+    getBreakdown(c.env.DB, "country", "clicks", windowDays, 10),
+    getBreakdown(c.env.DB, "device", "clicks", windowDays, 10),
   ]);
   const ctr = views > 0 ? Math.round((total / views) * 1000) / 10 : 0;
 
