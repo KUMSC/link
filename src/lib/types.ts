@@ -65,6 +65,7 @@ export interface Profile {
   orgName: string;
   tagline: string;
   avatarKey: string | null;
+  bannerKey: string | null;
   accentColor: string;
   socials: Social[];
   theme: Theme;

@@ -39,6 +39,15 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
   },
   {
+    id: "swiss",
+    name: "Swiss",
+    swatches: ["#fafafa", "#09090b", "#e11d48"],
+    palettes: {
+      light: { accent: "#e11d48", surface: "#fafafa", text: "#09090b", muted: "#71717a" },
+      dark: { accent: "#f43f5e", surface: "#09090b", text: "#fafafa", muted: "#a1a1aa" },
+    },
+  },
+  {
     id: "sunset",
     name: "Sunset",
     swatches: ["#fff7ed", "#7c2d12", "#f97316"],

@@ -4,8 +4,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Check, ImageOff, Loader2, Plus, Trash2 } from "lucide-react";
-import { getAdminData, removeAvatar, updateProfile, uploadAvatar } from "../../lib/api";
+import { Check, ImageOff, ImageIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  getAdminData,
+  removeAvatar,
+  removeBanner,
+  updateProfile,
+  uploadAvatar,
+  uploadBanner,
+} from "../../lib/api";
 import { PLATFORM_LABELS, SOCIAL_PLATFORMS, validateUrl } from "../../lib/platforms";
 import { FONT_CHOICES, THEME_PRESETS, themeFromPreset } from "../../lib/themes";
 import { ThemeProvider } from "../../lib/ThemeContext";
@@ -51,6 +58,8 @@ export default function BrandingTab() {
   const [newUrl, setNewUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [draftTheme, setDraftTheme] = useState<Theme>(DEFAULT_THEME);
 
@@ -68,6 +77,7 @@ export default function BrandingTab() {
       setSocials(data.profile.socials);
       setDraftTheme(data.profile.theme ?? DEFAULT_THEME);
       setAvatarPreview(data.profile.avatarKey ? `/api/avatar?v=${data.profile.updatedAt}` : null);
+      setBannerPreview(data.profile.bannerKey ? `/api/banner?v=${data.profile.updatedAt}` : null);
     }
   }, [data, form]);
 
@@ -118,6 +128,28 @@ export default function BrandingTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Remove failed"),
   });
 
+  const bannerMutation = useMutation({
+    mutationFn: uploadBanner,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      toast.success("Cover banner uploaded");
+      setBannerFile(null);
+      setBannerPreview(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Banner upload failed"),
+  });
+
+  const bannerRemoveMutation = useMutation({
+    mutationFn: removeBanner,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      toast.success("Cover banner removed");
+      setBannerFile(null);
+      setBannerPreview(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Banner removal failed"),
+  });
+
   const addSocial = () => {
     const url = newUrl.trim();
     if (!validateUrl(url)) {
@@ -128,7 +160,8 @@ export default function BrandingTab() {
     setNewUrl("");
   };
 
-    const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
+  const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
+  const hasBanner = !!(bannerPreview || data?.profile.bannerKey);
 
   // Tracks manual palette edits: mode switching keeps custom colors instead of
   // resetting to the preset's palette for the new mode.
@@ -153,7 +186,8 @@ export default function BrandingTab() {
       id: 1,
       orgName: form.watch("orgName") || "Your organization",
       tagline: form.watch("tagline") || "Tagline goes here",
-      avatarKey: data?.profile.avatarKey ?? null,
+      avatarKey: avatarPreview ? "preview" : (data?.profile.avatarKey ?? null),
+      bannerKey: bannerPreview ? "preview" : (data?.profile.bannerKey ?? null),
       accentColor: draftTheme.palette.accent,
       socials,
       theme: draftTheme,
@@ -340,6 +374,62 @@ export default function BrandingTab() {
                 </Button>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Cover Banner */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Cover Banner</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div
+              className="relative flex h-28 w-full items-center justify-center overflow-hidden rounded-xl border bg-muted/40"
+              style={{ borderColor: "color-mix(in srgb, var(--text) 12%, transparent)" }}
+            >
+              {bannerPreview ? (
+                <img src={bannerPreview} alt="Banner preview" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-mono tracking-wider uppercase text-muted-foreground">
+                  <ImageIcon className="h-4 w-4" />
+                  <span>No banner uploaded</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex-1">
+                <Input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error("Image must be under 5MB");
+                      return;
+                    }
+                    setBannerFile(file);
+                    setBannerPreview(URL.createObjectURL(file));
+                  }}
+                />
+              </label>
+              <Button onClick={() => bannerFile && bannerMutation.mutate(bannerFile)} disabled={!bannerFile || bannerMutation.isPending}>
+                {bannerMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Upload
+              </Button>
+              {hasBanner && (
+                <Button
+                  variant="outline"
+                  onClick={() => bannerRemoveMutation.mutate()}
+                  disabled={bannerRemoveMutation.isPending}
+                  aria-label="Remove banner"
+                >
+                  {bannerRemoveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+                  Remove
+                </Button>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">Recommended 1200×400 or 16:9 • Shown as the top header banner</p>
           </CardContent>
         </Card>
 

@@ -3,6 +3,7 @@ import type { Env } from "./env";
 import { verifyAccess } from "./access";
 import {
   clearAvatarKey,
+  clearBannerKey,
   createLink,
   deleteLink,
   getAllClicks,
@@ -20,6 +21,7 @@ import {
   recordView,
   reorderLinks,
   setAvatarKey,
+  setBannerKey,
   updateLink,
   updateProfile,
 } from "./db";
@@ -113,6 +115,17 @@ app.get("/api/avatar", async (c) => {
   const profile = await getProfile(c.env.DB);
   if (!profile.avatarKey) return c.notFound();
   const obj = await c.env.UPLOADS.get(profile.avatarKey);
+  if (!obj) return c.notFound();
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set("Cache-Control", "public, max-age=3600");
+  return new Response(obj.body, { headers });
+});
+
+app.get("/api/banner", async (c) => {
+  const profile = await getProfile(c.env.DB);
+  if (!profile.bannerKey) return c.notFound();
+  const obj = await c.env.UPLOADS.get(profile.bannerKey);
   if (!obj) return c.notFound();
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
@@ -221,6 +234,36 @@ app.delete("/api/admin/avatar", async (c) => {
   await clearAvatarKey(c.env.DB);
   c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("avatar_removed", { email: c.get("email") });
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/banner", async (c) => {
+  const body = await c.req.parseBody();
+  const file = body["banner"];
+  if (!(file instanceof File)) return c.json({ error: "missing banner file" }, 400);
+  const ext = file.name.split(".").pop() ?? "png";
+  const key = `banner-${Date.now()}.${ext}`;
+  await c.env.UPLOADS.put(key, file.stream(), {
+    httpMetadata: { contentType: file.type },
+  });
+  const profile = await getProfile(c.env.DB);
+  if (profile.bannerKey && profile.bannerKey !== key) {
+    await c.env.UPLOADS.delete(profile.bannerKey).catch(() => {});
+  }
+  await setBannerKey(c.env.DB, key);
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
+  logger.info("banner_uploaded", { email: c.get("email"), key });
+  return c.json({ key });
+});
+
+app.delete("/api/admin/banner", async (c) => {
+  const profile = await getProfile(c.env.DB);
+  if (profile.bannerKey) {
+    await c.env.UPLOADS.delete(profile.bannerKey).catch(() => {});
+  }
+  await clearBannerKey(c.env.DB);
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
+  logger.info("banner_removed", { email: c.get("email") });
   return c.json({ ok: true });
 });
 

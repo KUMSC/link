@@ -67,6 +67,22 @@ export async function removeAvatar(): Promise<void> {
   if (!res.ok) throw new Error("Failed to remove avatar");
 }
 
+export async function uploadBanner(file: File): Promise<{ key: string }> {
+  const form = new FormData();
+  form.append("banner", file);
+  return parse(
+    fetch(`${BASE}/admin/banner`, {
+      method: "POST",
+      body: form,
+    }),
+  );
+}
+
+export async function removeBanner(): Promise<void> {
+  const res = await fetch(`${BASE}/admin/banner`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to remove banner");
+}
+
 export async function createLink(fields: {
   label: string;
   url: string;
