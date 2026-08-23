@@ -1,187 +1,142 @@
 # Link in Bio
 
-A self-hostable link-in-bio platform for clubs and organizations, built 100% on Cloudflare's free tier. Deploy your own copy, set your branding, and share event forms, socials, and links from one page you own.
+A self-hostable link-in-bio platform for clubs and organizations, built 100% on Cloudflare's free tier. Deploy your own copy, set your branding, and share event passes, forms, socials, and links from one clean page you control.
+
+---
 
 ## Features
 
-- **Public page** — avatar, tagline, social icon row, link cards, event countdown cards
-- **Themes** — 6 presets (light + dark palettes), Google Font picker, 4-color palette editor, live preview in the admin
-- **Events** — links with start/end time + location; render as countdown cards
-- **Thumbnails** — per-link/event images stored in R2, shown on cards
-- **Icons** — pick a brand or generic icon per link card
-- **Analytics** — page views, unique visitors (privacy-friendly hashed daily uniques), clicks, CTR, top referrers, countries, devices; 7/30/90/all-time ranges; CSV export
-- **Sharing** — copy-link, QR code (with SVG download for posters), X and WhatsApp share
-- **Admin auth** — Cloudflare Access (free up to 50 users) with Worker-side JWT verification
+- **Public Page & Identity Studio** — Circular avatar, 140-character clamped tagline, mobile-first labeled social handles, categorized link feed, and physical event ticket passes.
+- **Instant Search & Category Filter Chips** — Fast real-time client-side search across labels, locations, and category tags (`All`, `Events`, `Spotlight`, and custom tags).
+- **Physical Event Ticket Passes** — Crisp ticket layout with perforated tear notches, category tags, start/end dates, location, and customizable RSVP status badges (`Open`, `Closed`, `Sold Out`, `Free Entry`, `Invite Only`, `Waitlist`).
+- **Live Event Countdown Tickers** — Real-time countdown clock on tickets (`Starts in 2d 14h`, `Starts in 45m`, `Live Now`, `Concluded`).
+- **Add to Calendar Engine** — 1-click Google Calendar URL generation and downloadable RFC 5545 Apple / Outlook `.ics` calendar files.
+- **Unified Sharing & QR Modal** — Single clean modal with high-precision vector SVG QR code, 1-click link copying, SVG QR download for posters, and native Web Share API trigger.
+- **Link Scheduling & Auto-Expiry** — Publish At and Expire At date-time pickers with automatic visibility filtering on the public page, archive support, and status badges in admin.
+- **1-Click Link & Event Duplication** — Clone any link or event ticket directly from the admin dashboard.
+- **Themes & Styling Studio** — 6 presets (light and dark palettes), Google Font typography selection, 4-color palette editor, card radius and shadow customization, and live Light/Dark mode preview switcher.
+- **Analytics & Campaign Tracking** — Page views, unique visitors (privacy-friendly hashed daily uniques), clicks, CTR, geographic locations, user devices, top referrers, and campaign source tags (`?src=`, `?utm_source=`); 7/30/90/all-time ranges; CSV export.
+- **Backup & Disaster Recovery** — 1-click JSON snapshot export and full restore capability.
+- **Admin Auth & Security** — Cloudflare Access (free for up to 50 users) with edge and Worker-side JWT signature verification.
+
+---
 
 ## Stack
 
-- **Frontend**: Vite 8 + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui
+- **Frontend**: Vite 8 + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui + Lucide Icons
 - **Backend**: Hono (Cloudflare Worker) via `@cloudflare/vite-plugin`
-- **Data**: D1 (SQLite) · **Files**: R2 (avatar + thumbnail uploads)
-- **Cache**: optional Workers KV for the public payload (auto-invalidated on edits)
-- **Admin auth**: Cloudflare Access (free for up to 50 users)
-- **Social preview**: build-time OG image (satori + resvg), no runtime image processing
+- **Database**: Cloudflare D1 (SQLite) with auto-healing schema migrations
+- **Asset Storage**: Cloudflare R2 (avatar, cover banner, and event thumbnail uploads)
+- **Edge Caching**: Cloudflare Workers KV for public payloads (auto-invalidated on admin mutations)
+- **Admin Auth**: Cloudflare Access (free for up to 50 team members)
+- **Social Preview**: Build-time static Open Graph image generation (`satori` + `resvg`), zero runtime image compute
 
-## Project layout
+---
+
+## Project Layout
 
 ```
-worker/            Hono API: public page, click tracking, admin CRUD, Access JWT check
-src/pages/         React SPA: PublicPage + admin dashboard (Links/Branding/Analytics)
-src/components/ui/ shadcn components
-migrations/        D1 schema (0001_init.sql) + seed data
-scripts/gen-og.mjs Build-time OG image generator → public/og.png
-public/            static assets (og.png, favicon.svg, robots.txt)
-og.config.json     Branding used for the generated OG image
+worker/               Hono API: public bootstrap, click tracking, admin CRUD, Access JWT check
+worker/db.ts          D1 query layer, link scheduling, click/view recording, backups
+worker/schema.ts      Idempotent schema definitions and column backfills
+src/pages/            React SPA: PublicPage + Admin dashboard (Links, Branding, Analytics)
+src/components/ui/    shadcn UI components
+migrations/           D1 SQL migration files and seed datasets
+scripts/gen-og.mjs    Build-time Open Graph image generator -> public/og.png
+public/               Static assets (og.png, favicon.svg, robots.txt)
+og.config.json        Branding configuration used for static OG generation
 ```
 
-## Local development
+---
 
-Requires Node ≥ 22.22 (React Router 8 baseline).
+## Local Development
+
+Requires Node >= 22.22.
 
 ```bash
+# 1. Install dependencies
 npm install
-npm run db:migrate:local    # apply schema to local D1
-npm run db:seed:local       # seed sample profile + links
-npm run dev                 # Vite dev server (Worker runs in workerd, HMR enabled)
+
+# 2. Apply migrations to local D1 SQLite
+npm run db:migrate:local
+
+# 3. Seed sample club profile and links
+npm run db:seed:local
+
+# 4. Start local development server with HMR
+npm run dev
 ```
 
-In local dev, admin auth is **skipped** because `ACCESS_TEAM_DOMAIN`/`ACCESS_AUD`
-are empty in `.dev.vars`. The public page is at `/`, the dashboard at `/admin`.
+In local development, admin authentication is bypassed because `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are unset in `.dev.vars`. The public page is served at `http://localhost:5173/`, and the admin dashboard is at `http://localhost:5173/admin`.
 
-## Deploy
+---
 
-### Option A — Cloudflare UI / GitHub (recommended)
+## Deployment
 
-Cloudflare can **auto-provision** the D1 database and R2 bucket for you. In
-`wrangler.jsonc`, `database_id` is intentionally **omitted** so the platform
-creates the resources automatically and injects the real id on deploy.
+Refer to [DEPLOYMENT.md](DEPLOYMENT.md) for complete, step-by-step instructions.
 
-1. Push this repo to GitHub (done).
-2. **Enable R2 (one-time):** Cloudflare dashboard → **R2** → **Activate R2**. R2 has a
-   free tier but must be opted into before any bucket can be created. Without this,
-   the deploy fails with `code: 10042 (Please enable R2)`.
-3. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import repository**
-   (or use the *Deploy to Cloudflare* button if the repo is public).
-4. Cloudflare clones the repo, **auto-creates `club-link-db` + `club-link-uploads`**,
-   and deploys. Subsequent pushes to the connected branch redeploy automatically.
-5. Apply the schema to the remote database:
+### Quick Deploy Steps
+
+1. **Enable R2 (One-Time)**:
+   In your Cloudflare Dashboard, navigate to **R2** and click **Activate R2** (required for the free tier storage buckets).
+
+2. **Deploy via GitHub / Cloudflare Dashboard**:
+   - Cloudflare Dashboard -> **Workers & Pages** -> **Create** -> **Import repository**.
+   - Cloudflare automatically creates `club-link-db` (D1) and `club-link-uploads` (R2) and deploys your Worker.
+
+3. **Apply Remote Database Schema**:
    ```bash
-   npm run db:migrate:remote   # auto-resolves the provisioned D1 id
+   npm run db:migrate:remote
    npm run db:seed:remote
    ```
-6. Set the two secrets (never auto-created):
-   ```bash
-   npx wrangler secret put ACCESS_TEAM_DOMAIN   # e.g. https://yourteam.cloudflareaccess.com
-   npx wrangler secret put ACCESS_AUD           # your Access application AUD tag
-   ```
-7. **Optional — KV caching** (KV namespaces are *not* auto-provisioned):
-   ```bash
-   npx wrangler kv namespace create CACHE       # → copy the id
-   ```
-   then add to `wrangler.jsonc`:
-   ```jsonc
-   "kv_namespaces": [{ "binding": "CACHE", "id": "<the id>" }]
-   ```
-   Without it the app works identically; it just skips caching.
 
-### Option B — manual CLI
+4. **Configure Cloudflare Access for Admin Protection**:
+   - Cloudflare Dashboard -> **Zero Trust** -> **Access** -> **Applications** -> **Add an application** (*Self-hosted*).
+   - Set Path Rule to `/admin*` and `/api/admin/*`.
+   - Copy your **Application Audience (AUD) Tag** and set Worker secrets:
+     ```bash
+     npx wrangler secret put ACCESS_TEAM_DOMAIN   # e.g. https://yourteam.cloudflareaccess.com
+     npx wrangler secret put ACCESS_AUD           # your Access Application Audience tag
+     ```
 
-1. **Create D1 + R2 resources** (one-time):
+---
 
-```bash
-npx wrangler d1 create club-link-db        # → copy the database_id
-npx wrangler r2 bucket create club-link-uploads
-```
+## Campaign & UTM Tracking
 
-2. Put the D1 `database_id` into `wrangler.jsonc` (or rely on `scripts/patch-db-id.mjs` to fetch it).
+You can track traffic sources without compromising visitor privacy by appending `?src=`, `?utm_source=`, or `?ref=` to your public link:
 
-3. Set Access secrets so `/api/admin/*` is protected:
+- `https://yourclub.workers.dev/?src=instagram_bio`
+- `https://yourclub.workers.dev/?src=poster_qr`
+- `https://yourclub.workers.dev/?src=discord_announcement`
 
-```bash
-npx wrangler secret put ACCESS_TEAM_DOMAIN   # e.g. https://yourteam.cloudflareaccess.com
-npx wrangler secret put ACCESS_AUD           # your Access application AUD tag
-```
+Traffic sources are aggregated in the **Analytics** tab under the **Campaign Tags** card and included in CSV exports.
 
-4. Deploy:
+---
 
-```bash
-npm run deploy       # regenerates public/og.png, then builds worker + SPA and deploys
-```
+## Free-Tier Budget
 
-5. Apply the schema to the remote D1:
-
-```bash
-npm run db:migrate:remote
-npm run db:seed:remote
-```
-
-> `db:migrate:remote` runs `scripts/patch-db-id.mjs` first, which fetches the
-> D1 database id from your account if it isn't in the config yet — so the
-> command works whether you created the DB manually or it was auto-provisioned.
-
-## Protecting /admin with Cloudflare Access
-
-Access gates `/admin*` at the edge so only your club's members reach the dashboard.
-
-1. Cloudflare dashboard → Zero Trust → **Access → Applications** → **Add an application** → *Self-hosted*.
-2. Application domain: `*.workers.dev` or your custom domain; set **path** to `/admin` and **path match** to *Regex*, include rule `^/admin(?:/.*)?$` plus `^/api/admin/.*$`.
-3. Policy: *Allow*, selector **Emails** → add club members' addresses (or your org's IdP group). Session duration e.g. 24h.
-4. Under **Additional settings**, copy the **Application Audience (AUD) Tag** → use as the `ACCESS_AUD` secret above.
-
-The Worker also verifies the `Cf-Access-Jwt-Assertion` JWT on every `/api/admin/*`
-request (defense-in-depth), so the API stays locked even if the Worker is reached directly.
-
-> **Free plan note**: Cloudflare Access is free for up to 50 users.
-
-## OG / social preview
-
-`npm run build` runs `scripts/gen-og.mjs`, which renders `public/og.png` (1200×630)
-from `og.config.json`. The Worker injects live `og:title` / `og:description` meta
-from the admin-set profile at request time; the image is the static file.
-
-To regenerate after changing branding in `og.config.json`:
-
-```bash
-npm run gen:og
-```
-
-## Deploying for another organization
-
-This is single-tenant-per-deploy by design: one copy = one club's page. To spin up
-a new club, deploy the repo again under a new Worker name, point it at fresh D1/R2
-resources, update `og.config.json` + `migrations/seed.sql`, and re-run the deploy
-steps. All content (links, socials, branding, avatar) is managed by the club admins
-in the dashboard afterward.
-
-## Free-tier budget
-
-| Resource | Our usage | Free limit |
+| Resource | App Usage | Free Limit |
 |---|---|---|
-| Worker requests | hundreds/day | 100,000/day |
-| CPU | ~2–5ms (Hono + D1) | 10ms/request |
-| D1 reads / writes | few per request / 1 per click | 5M / 100K per day |
-| R2 | <10MB avatar | 10GB |
-| Bundle (gzip) | ~26KB worker | 3MB |
-| Access | ≤50 club members | free |
-| Workers Logs | a few events/request | 200K events/day |
+| Worker Requests | Hundreds / day | 100,000 / day |
+| CPU Time | ~2-5ms (Hono + D1) | 10ms / request |
+| D1 Reads / Writes | Few per request / 1 per click | 5M reads / 100K writes per day |
+| R2 Storage | <10MB profile & card assets | 10GB / month |
+| Admin Access Auth | Club executive team | 50 users free |
+| Workers Logs | Structured JSON events | 200,000 events / day |
 
-## Observability
+---
 
-Workers Logs is enabled (free tier: 200K log events/day, 3-day retention).
-Wrangler config:
+## Observability & Logging
 
-```jsonc
-"observability": { "enabled": true, "head_sampling_rate": 1 }
+Structured JSON logging is enabled by default. To stream live production logs:
+
+```bash
+npx wrangler tail link
 ```
 
-The Worker emits **structured JSON logs** (auto-indexed by Workers Logs) for:
-
-- `request` — method, path, status, duration_ms (every request)
-- `link_click` — link_id, label (when someone clicks a link)
-- `admin_request` — email, method, path (every admin API call)
-- `profile_updated` / `avatar_uploaded` / `link_created` / `link_updated` / `link_deleted` — admin audit trail
-- `unhandled_error` — path, message, name (via Hono's `onError`)
-
-View them: dashboard → **Workers & Pages → `link` → Observability**. Filter by
-`message`, `link_id`, `email`, or `status`. For streaming live logs in a
-terminal: `npx wrangler tail link`.
+Event types emitted:
+- `request`: method, path, status, duration_ms
+- `link_click`: link_id, label, source_tag
+- `admin_request`: authenticated email, method, path
+- `profile_updated`, `avatar_uploaded`, `link_created`, `link_updated`, `link_deleted`, `backup_restored`
+- `unhandled_error`: error message, stack, path
