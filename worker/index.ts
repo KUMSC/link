@@ -4,6 +4,7 @@ import { verifyAccess } from "./access";
 import {
   clearAvatarKey,
   clearBannerKey,
+  clearFaviconKey,
   createLink,
   deleteLink,
   duplicateLink,
@@ -26,6 +27,7 @@ import {
   restoreBackup,
   setAvatarKey,
   setBannerKey,
+  setFaviconKey,
   updateLink,
   updateProfile,
 } from "./db";
@@ -33,7 +35,7 @@ import { injectBootstrap, injectMeta } from "./meta";
 import { ensureSchema } from "./schema";
 import { logger } from "./log";
 import { cachePublic, detectDevice, getCachedPublic, invalidatePublicCache, nullable, visitorHash } from "./util";
-import type { Theme } from "../src/lib/types";
+import type { LinkItem, Profile, Social, Theme } from "../src/lib/types";
 import { parseTheme } from "../src/lib/types";
 
 type Bindings = Env;
@@ -195,6 +197,37 @@ app.get("/api/banner", async (c) => {
   return new Response(obj.body, { headers });
 });
 
+app.get("/api/favicon", async (c) => {
+  const profile = await getProfile(c.env.DB);
+  if (!profile.faviconKey) {
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
+  const obj = await c.env.UPLOADS.get(profile.faviconKey);
+  if (!obj) {
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
+  const etag = `"${profile.faviconKey}-${profile.updatedAt}"`;
+  if (c.req.header("If-None-Match") === etag) {
+    return new Response(null, { status: 304 });
+  }
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set("ETag", etag);
+  const hasVersion = c.req.query("v");
+  if (hasVersion) {
+    headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600");
+  } else {
+    headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  }
+  return new Response(obj.body, { headers });
+});
+
 // Public thumbnail for a link/event card: /api/thumb/:id
 app.get("/api/thumb/:id", async (c) => {
   const id = Number(c.req.param("id"));
@@ -276,7 +309,7 @@ app.put("/api/admin/profile", async (c) => {
     orgName?: string;
     tagline?: string;
     accentColor?: string;
-    socials?: unknown;
+    socials?: Social[];
     theme?: Theme;
   }>();
   const profile = await updateProfile(c.env.DB, {
@@ -348,6 +381,36 @@ app.delete("/api/admin/banner", async (c) => {
   await clearBannerKey(c.env.DB);
   c.executionCtx.waitUntil(invalidatePublicCache(c.env));
   logger.info("banner_removed", { email: c.get("email") });
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/favicon", async (c) => {
+  const body = await c.req.parseBody();
+  const file = body["favicon"];
+  if (!(file instanceof File)) return c.json({ error: "missing favicon file" }, 400);
+  const ext = file.name.split(".").pop() ?? "ico";
+  const key = `favicon-${Date.now()}.${ext}`;
+  await c.env.UPLOADS.put(key, file.stream(), {
+    httpMetadata: { contentType: file.type },
+  });
+  const profile = await getProfile(c.env.DB);
+  if (profile.faviconKey && profile.faviconKey !== key) {
+    await c.env.UPLOADS.delete(profile.faviconKey).catch(() => {});
+  }
+  await setFaviconKey(c.env.DB, key);
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
+  logger.info("favicon_uploaded", { email: c.get("email"), key });
+  return c.json({ key });
+});
+
+app.delete("/api/admin/favicon", async (c) => {
+  const profile = await getProfile(c.env.DB);
+  if (profile.faviconKey) {
+    await c.env.UPLOADS.delete(profile.faviconKey).catch(() => {});
+  }
+  await clearFaviconKey(c.env.DB);
+  c.executionCtx.waitUntil(invalidatePublicCache(c.env));
+  logger.info("favicon_removed", { email: c.get("email") });
   return c.json({ ok: true });
 });
 

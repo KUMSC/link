@@ -42,7 +42,7 @@ const CREATE_STATEMENTS = [
 
 // Columns to backfill on existing databases (table -> [column defs]).
 const COLUMN_ADDITIONS: Record<string, string[]> = {
-  profile: ["theme TEXT NOT NULL DEFAULT '{}'", "banner_key TEXT"],
+  profile: ["theme TEXT NOT NULL DEFAULT '{}'", "banner_key TEXT", "favicon_key TEXT"],
   links: [
     "kind TEXT NOT NULL DEFAULT 'link'",
     "starts_at INTEGER",

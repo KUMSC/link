@@ -194,7 +194,8 @@ export function findPreset(id: string): ThemePreset {
 /** Build a full Theme from a preset id + mode + optional overrides. */
 export function themeFromPreset(id: string, mode: Theme["mode"], overrides?: Partial<Theme>): Theme {
   const preset = findPreset(id);
-  const palette = preset.palettes[mode === "system" ? "light" : mode];
+  const paletteKey: "light" | "dark" = mode === "dark" ? "dark" : "light";
+  const palette = preset.palettes[paletteKey];
   return {
     preset: preset.id,
     fontHeading: overrides?.fontHeading ?? preset.defaults.fontHeading,

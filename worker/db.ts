@@ -9,6 +9,7 @@ function mapProfile(row: Record<string, unknown>): Profile {
     tagline: (row.tagline as string) ?? "",
     avatarKey: (row.avatar_key as string | null) ?? null,
     bannerKey: (row.banner_key as string | null) ?? null,
+    faviconKey: (row.favicon_key as string | null) ?? null,
     accentColor: (row.accent_color as string) ?? "#6366f1",
     socials: JSON.parse((row.socials as string) ?? "[]"),
     theme: parseTheme(row.theme as string | null | undefined),
@@ -39,7 +40,7 @@ function mapLink(row: Record<string, unknown>): LinkItem {
   };
 }
 
-const PROFILE_COLS = "id, org_name, tagline, avatar_key, banner_key, accent_color, socials, theme, updated_at";
+const PROFILE_COLS = "id, org_name, tagline, avatar_key, banner_key, favicon_key, accent_color, socials, theme, updated_at";
 const LINK_COLS =
   "id, label, url, icon, highlight, sort_order, kind, starts_at, ends_at, location, thumbnail_key, status, category_tag, cta_text, publish_at, expires_at, archived, created_at";
 
@@ -92,6 +93,14 @@ export async function setBannerKey(db: D1Database, key: string): Promise<void> {
 
 export async function clearBannerKey(db: D1Database): Promise<void> {
   await db.prepare("UPDATE profile SET banner_key = NULL, updated_at = unixepoch() WHERE id = 1").run();
+}
+
+export async function setFaviconKey(db: D1Database, key: string): Promise<void> {
+  await db.prepare("UPDATE profile SET favicon_key = ?, updated_at = unixepoch() WHERE id = 1").bind(key).run();
+}
+
+export async function clearFaviconKey(db: D1Database): Promise<void> {
+  await db.prepare("UPDATE profile SET favicon_key = NULL, updated_at = unixepoch() WHERE id = 1").run();
 }
 
 export async function getLinks(db: D1Database): Promise<LinkItem[]> {

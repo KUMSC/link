@@ -22,10 +22,12 @@ import {
   getBackupData,
   removeAvatar,
   removeBanner,
+  removeFavicon,
   restoreBackupData,
   updateProfile,
   uploadAvatar,
   uploadBanner,
+  uploadFavicon,
 } from "../../lib/api";
 import { PLATFORM_LABELS, SOCIAL_PLATFORMS, validateUrl } from "../../lib/platforms";
 import {
@@ -103,11 +105,14 @@ export default function BrandingTab() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
+  const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [draftTheme, setDraftTheme] = useState<Theme>(DEFAULT_THEME);
 
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  const faviconInputRef = useRef<HTMLInputElement | null>(null);
 
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -130,8 +135,11 @@ export default function BrandingTab() {
       if (!bannerFile) {
         setBannerPreview(data.profile.bannerKey ? `/api/banner?v=${data.profile.updatedAt}` : null);
       }
+      if (!faviconFile) {
+        setFaviconPreview(data.profile.faviconKey ? `/api/favicon?v=${data.profile.updatedAt}` : null);
+      }
     }
-  }, [data, form, avatarFile, bannerFile]);
+  }, [data, form, avatarFile, bannerFile, faviconFile]);
 
   const saveMutation = useMutation({
     mutationFn: (values: { orgName: string; tagline: string; socials: SocialRow[]; theme: Theme }) =>
@@ -204,6 +212,29 @@ export default function BrandingTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Banner removal failed"),
   });
 
+  const faviconMutation = useMutation({
+    mutationFn: uploadFavicon,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      toast.success("Favicon uploaded");
+      setFaviconFile(null);
+      if (faviconInputRef.current) faviconInputRef.current.value = "";
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Favicon upload failed"),
+  });
+
+  const faviconRemoveMutation = useMutation({
+    mutationFn: removeFavicon,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      toast.success("Favicon removed");
+      setFaviconFile(null);
+      setFaviconPreview(null);
+      if (faviconInputRef.current) faviconInputRef.current.value = "";
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Favicon removal failed"),
+  });
+
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportBackup = async () => {
@@ -262,6 +293,7 @@ export default function BrandingTab() {
 
   const hasAvatar = !!(avatarPreview || data?.profile.avatarKey);
   const hasBanner = !!(bannerPreview || data?.profile.bannerKey);
+  const hasFavicon = !!(faviconPreview || data?.profile.faviconKey);
 
   const paletteDirty = useRef(false);
 
@@ -298,6 +330,7 @@ export default function BrandingTab() {
       tagline: form.watch("tagline") || "",
       avatarKey: avatarFile ? "preview" : avatarPreview ? data?.profile.avatarKey ?? "avatar" : null,
       bannerKey: bannerFile ? "preview" : bannerPreview ? data?.profile.bannerKey ?? "banner" : null,
+      faviconKey: faviconFile ? "preview" : faviconPreview ? data?.profile.faviconKey ?? "favicon" : null,
       accentColor: draftTheme.palette.accent,
       socials,
       theme: draftTheme,
@@ -680,6 +713,78 @@ export default function BrandingTab() {
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">Recommended 1200×400 or 16:9 • Displayed at the top of your public page</p>
+          </CardContent>
+        </Card>
+
+        {/* Custom Favicon */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Custom Favicon</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted/40 p-1.5"
+                style={{ borderColor: "color-mix(in srgb, var(--text) 12%, transparent)" }}
+              >
+                {faviconPreview ? (
+                  <img src={faviconPreview} alt="Favicon preview" className="h-full w-full object-contain" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <ImageIcon className="h-5 w-5 opacity-60" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-foreground">Browser Tab Icon</span>
+                  {hasFavicon ? (
+                    <span className="inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">Custom Active</span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-md bg-zinc-500/10 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Default SVG</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                  Shown in browser tabs, bookmarks, and shortcuts.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="flex-1">
+                <Input
+                  ref={faviconInputRef}
+                  type="file"
+                  accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,image/jpeg,image/webp"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) {
+                      toast.error("Favicon must be under 2MB");
+                      return;
+                    }
+                    setFaviconFile(file);
+                    setFaviconPreview(URL.createObjectURL(file));
+                  }}
+                />
+              </label>
+              <Button onClick={() => faviconFile && faviconMutation.mutate(faviconFile)} disabled={!faviconFile || faviconMutation.isPending}>
+                {faviconMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Upload
+              </Button>
+              {hasFavicon && (
+                <Button
+                  variant="outline"
+                  onClick={() => faviconRemoveMutation.mutate()}
+                  disabled={faviconRemoveMutation.isPending}
+                  aria-label="Remove favicon"
+                >
+                  {faviconRemoveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+                  Remove
+                </Button>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">Recommended 32×32 or 64×64 square PNG, ICO, or SVG • Under 2MB</p>
           </CardContent>
         </Card>
 

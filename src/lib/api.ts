@@ -83,6 +83,22 @@ export async function removeBanner(): Promise<void> {
   if (!res.ok) throw new Error("Failed to remove banner");
 }
 
+export async function uploadFavicon(file: File): Promise<{ key: string }> {
+  const form = new FormData();
+  form.append("favicon", file);
+  return parse(
+    fetch(`${BASE}/admin/favicon`, {
+      method: "POST",
+      body: form,
+    }),
+  );
+}
+
+export async function removeFavicon(): Promise<void> {
+  const res = await fetch(`${BASE}/admin/favicon`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to remove favicon");
+}
+
 export async function createLink(fields: {
   label: string;
   url: string;

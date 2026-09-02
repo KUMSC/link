@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   ArrowUpRight,
@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { renderSVG } from "uqr";
 import { getPublic } from "../lib/api";
-import type { LinkItem, Profile } from "../lib/types";
+import type { LinkItem, PlatformId, Profile } from "../lib/types";
 import { PLATFORM_LABELS } from "../lib/platforms";
 import { PlatformIcon } from "../lib/icons";
 import { LinkIconBadge } from "../lib/link-icon";
@@ -1009,7 +1009,7 @@ function ShareModal({
               <span>Download QR</span>
             </button>
 
-            {typeof navigator !== "undefined" && navigator.share && (
+            {typeof navigator !== "undefined" && "share" in navigator && (
               <button
                 type="button"
                 onClick={shareNative}
@@ -1299,6 +1299,26 @@ export default function PublicPage() {
     staleTime: 5_000,
     initialData: (window as Window & { __PUBLIC_DATA__?: PageData }).__PUBLIC_DATA__,
   });
+
+  useEffect(() => {
+    if (!data?.profile) return;
+    const faviconHref = data.profile.faviconKey
+      ? `/api/favicon?v=${data.profile.updatedAt || 1}`
+      : "/favicon.svg";
+
+    let iconLink = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+    if (!iconLink) {
+      iconLink = document.createElement("link");
+      iconLink.rel = "icon";
+      document.head.appendChild(iconLink);
+    }
+    iconLink.href = faviconHref;
+
+    let appleLink = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+    if (appleLink) {
+      appleLink.href = faviconHref;
+    }
+  }, [data?.profile?.faviconKey, data?.profile?.updatedAt]);
 
   if (isLoading) {
     return (

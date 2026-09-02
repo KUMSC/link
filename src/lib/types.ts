@@ -21,6 +21,7 @@ export interface Social {
 export type RadiusPreset = "none" | "sm" | "md" | "lg" | "full";
 export type ShadowPreset = "none" | "subtle" | "hard" | "elevated";
 export type BorderWidth = "hairline" | "thin" | "medium" | "thick";
+export type ThemeMode = "light" | "dark" | "system";
 
 export interface ThemePalette {
   accent: string;
@@ -92,6 +93,7 @@ export interface Profile {
   tagline: string;
   avatarKey: string | null;
   bannerKey: string | null;
+  faviconKey: string | null;
   accentColor: string;
   socials: Social[];
   theme: Theme;
