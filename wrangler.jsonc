@@ -15,13 +15,13 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "club-link-db"
+      "database_name": "link-db"
     }
   ],
   "r2_buckets": [
     {
       "binding": "UPLOADS",
-      "bucket_name": "club-link-uploads"
+      "bucket_name": "link-uploads"
     }
   ]
   // Optional KV caching: KV namespaces are NOT auto-provisioned (unlike D1/R2).

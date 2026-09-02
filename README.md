@@ -82,7 +82,7 @@ Refer to [DEPLOYMENT.md](DEPLOYMENT.md) for complete, step-by-step instructions.
 
 2. **Deploy via GitHub / Cloudflare Dashboard**:
    - Cloudflare Dashboard -> **Workers & Pages** -> **Create** -> **Import repository**.
-   - Cloudflare automatically creates `club-link-db` (D1) and `club-link-uploads` (R2) and deploys your Worker.
+   - Cloudflare automatically creates `link-db` (D1) and `link-uploads` (R2) and deploys your Worker.
 
 3. **Apply Remote Database Schema**:
    ```bash

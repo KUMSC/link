@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CONFIG_PATH = path.join(root, "wrangler.jsonc");
-const DB_NAME = "club-link-db";
+const DB_NAME = "link-db";
 
 const list = JSON.parse(execSync("npx wrangler d1 list --json", { cwd: root, encoding: "utf8" }));
 const db = list.find((d) => d.name === DB_NAME || d.database_name === DB_NAME);

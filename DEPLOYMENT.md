@@ -50,8 +50,8 @@ Before deploying any Worker that references an R2 bucket binding, you must activ
 
 3. **Auto-Provisioning**:
    - Cloudflare reads `wrangler.jsonc` and automatically provisions:
-     - `club-link-db` (D1 Database)
-     - `club-link-uploads` (R2 Bucket)
+     - `link-db` (D1 Database)
+     - `link-uploads` (R2 Bucket)
    - Click **Save and Deploy**.
 
 4. **Apply Database Migrations to Remote D1**:
@@ -74,10 +74,10 @@ Before deploying any Worker that references an R2 bucket binding, you must activ
 2. **Create Cloudflare Resources**:
    ```bash
    # Create the D1 Database
-   npx wrangler d1 create club-link-db
+   npx wrangler d1 create link-db
 
    # Create the R2 Storage Bucket
-   npx wrangler r2 bucket create club-link-uploads
+   npx wrangler r2 bucket create link-uploads
    ```
 
 3. **Copy the D1 Database ID**:
@@ -86,7 +86,7 @@ Before deploying any Worker that references an R2 bucket binding, you must activ
    "d1_databases": [
      {
        "binding": "DB",
-       "database_name": "club-link-db",
+       "database_name": "link-db",
        "database_id": "YOUR_D1_DATABASE_ID"
      }
    ]
